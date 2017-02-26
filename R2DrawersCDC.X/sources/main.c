@@ -397,35 +397,24 @@ void ProcessIO(void)
 	if (RS232_Out_Data_Rdy == 0)  // only check for new USB buffer if the old RS232 buffer is
 	{						  // empty.  This will cause additional USB packets to be NAK'd
 		LastRS232Out = getsUSBUSART(RS232_Out_Data,64); //until the buffer is free.
+        
 		if(LastRS232Out > 0)
-		{	
+		{
 			RS232_Out_Data_Rdy = 1;  // signal buffer full
 			RS232cp = 0;  // Reset the current position
 		}
 	}
 
-	#if defined(USB_CDC_SUPPORT_HARDWARE_FLOW_CONTROL)
-    	//Drive RTS pin, to let UART device attached know if it is allowed to 
-    	//send more data or not.  If the receive buffer is almost full, we 
-    	//deassert RTS.
-    	if(NextUSBOut <= (CDC_DATA_OUT_EP_SIZE - 5u))
-    	{
-            UART_RTS = USB_CDC_RTS_ACTIVE_LEVEL;
-        }   	
-        else
-        {
-        	UART_RTS = (USB_CDC_RTS_ACTIVE_LEVEL ^ 1);
-        }    
-    #endif	
-
     //Check if any bytes are waiting in the queue to send to the USB host.
     //If any bytes are waiting, and the endpoint is available, prepare to
     //send the USB packet to the host.
-	if((USBUSARTIsTxTrfReady()) && (NextUSBOut > 0))
-	{
-		putUSBUSART(&USB_Out_Buffer[0], NextUSBOut);
-		NextUSBOut = 0;
-	}
+    
+    
+    if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady()){
+        memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
+        putUSBUSART(USB_Out_Buffer, LastRS232Out);
+        RS232_Out_Data_Rdy = 0;
+    }
 
     CDCTxService();
 

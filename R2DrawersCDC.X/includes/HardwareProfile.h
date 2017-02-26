@@ -75,9 +75,10 @@
     #define DEMO_BOARD R2_DRAWER_BOARD_V2
 
     /** LED ************************************************************/
-    #define mInitAllLEDs()      {TRISBCLR = BIT_0 | BIT_1 | BIT_2 | BIT_3;}
+    #define mInitAllLEDs()      {TRISBCLR = BIT_0 | BIT_1 | BIT_2 | BIT_3; \
+                                 TRISACLR = BIT_0;}
     
-    #define mLED_1              LATBbits.LATB0
+    #define mLED_1              LATAbits.LATA0
     #define mLED_2              LATBbits.LATB1
     #define mLED_3              LATBbits.LATB2
     #define mLED_4              LATBbits.LATB3
