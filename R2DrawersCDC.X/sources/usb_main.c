@@ -123,86 +123,122 @@ void ProcessIO(void)
         memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
         
         enum states { SE_HEADER, GET_START, SOURCE_LENGTH, SOURCE_DATA,
-                        DEST_LENGTH, DEST_DATA};
+                        DEST_LENGTH, DEST_DATA, 
+                        GET_HEADER, GET_LENGTH, GET_DATA, 
+                        SE_FOOTER, GET_END};
+        enum dataTypes { START='b', SOURCE='s', DESTINATION='d', PAYLOAD='p', CHECKSUM='k' };
+        
         static uint8_t STATE = SE_HEADER;
-        char START_TEXT[] = "00S";
+        static uint8_t dataType = START;
+        
+        char START_TEXT[] = "00";
         char SELF[] = "DRWR01";
+        char dataSource[30];
+        char payloadBuffer[30];
+        char checksumBuffer[30];
         
         int i;
-        char buf[30];
+        
         for (i=0; i<LastRS232Out; i++){
             uint8_t c = USB_Out_Buffer[i];
+            uint8_t requiredType;
+            
             switch (STATE){
                 case SE_HEADER:
+                    dataType = START;
                     if (c == 'G'){
                         arrayIndex = 0;
-                        dataLength = 3;
+                        dataLength = 2;
                         STATE = GET_START;
-//                        putsUSBUSART("START\n\r");
+                        putsUSBUSART("START\n\r");
                     }
                     break;
                 case GET_START:
                     if (c != START_TEXT[arrayIndex++]){
                         // Wrong data... Retry from beginning.
                         STATE = SE_HEADER;
-//                        putsUSBUSART("WRONG\n\r");
+                        putsUSBUSART("WRONG\n\r");
                     }
                     else{
                         // Right data. Check if correct number received.
                         if (arrayIndex == dataLength){
-                            STATE = SOURCE_LENGTH;
-//                            putsUSBUSART("Get length\n\r");
+                            STATE = GET_HEADER;
+                            putsUSBUSART("GET HEADER\n\r");
                         }
                     }
                     break;
-                case SOURCE_LENGTH:
-                    arrayIndex = 0;
-                    dataLength = c - '0';
-                    STATE = SOURCE_DATA;
-                    if (dataLength < 0) dataLength = 0;
-                    if (dataLength > 9) dataLength = 4;
-//                    putsUSBUSART("Got length\n\r");
-                    break;
-                case SOURCE_DATA:
-                    readBuffer[arrayIndex++] = c;
-//                    putsUSBUSART("Got data\n\r");
-                    if (arrayIndex == dataLength){
-//                        readBuffer[dataLength] = '\n';
-//                        readBuffer[dataLength+1] = '\r';
-//                        putUSBUSART(readBuffer, dataLength+2);
-                        
-                        STATE = DEST_LENGTH;
+                case GET_HEADER:
+                    if (dataType == START) requiredType = SOURCE;
+                    else if (dataType == SOURCE) requiredType = DESTINATION;
+                    else if (dataType == DESTINATION) requiredType = PAYLOAD;
+                    else if (dataType == PAYLOAD) requiredType = CHECKSUM;
+                    
+                    if (c == 'S') c = SOURCE;
+                    else if (c == 'D') c = DESTINATION;
+                    else if (c == 'P') c = PAYLOAD;
+                    else if (c == 'K') c = CHECKSUM;
+                    
+                    if (requiredType == c){
+                        dataType = requiredType;
                     }
+                    else {
+                        STATE = SE_HEADER;
+                        break;
+                    }
+                    putsUSBUSART("GET LENGTH\n\r");
+                    STATE = GET_LENGTH;
                     break;
-                case DEST_LENGTH:
-                    arrayIndex = 0;
+                case GET_LENGTH:
                     dataLength = c - '0';
-                    STATE = DEST_DATA;
                     if (dataLength < 0) dataLength = 0;
-                    if (dataLength > 9) dataLength = 4;
-                case DEST_DATA:
+                    if (dataLength > 9) dataLength = 9;
+                    sprintf(readBuffer, "GET DATA: %d [%c]\n\r", dataLength, dataType);
+                    putsUSBUSART(readBuffer);
+                    arrayIndex = 0;
+                    STATE = GET_DATA;
+                    break;
+                case GET_DATA:
                     readBuffer[arrayIndex++] = c;
-//                    putsUSBUSART("Got data\n\r");
                     if (arrayIndex == dataLength){
-//                        readBuffer[dataLength] = '\n';
-//                        readBuffer[dataLength+1] = '\r';
-//                        putUSBUSART(readBuffer, dataLength+2);
-                        
-                        // Check if this message is intended for drawer
-                        if (strcmp(readBuffer, SELF)){
-                            // not to self
+                        if (dataType == SOURCE){
+                            strncpy(dataSource, readBuffer, dataLength);
+                            dataSource[dataLength] = '\0';
+                            STATE = GET_HEADER;
+                            sprintf(readBuffer, "DATA: %s\n\r", dataSource);
+                            putsUSBUSART(readBuffer);
+                        }
+                        else if (dataType == DESTINATION){
+                            readBuffer[dataLength] = '\0';
+                            if (strcmp(readBuffer, SELF)){
+                                // not aimed at self
+                                STATE = SE_HEADER;
+                                putsUSBUSART("NOT SELF\r\n");
+                            }
+                            else{
+                                STATE = GET_HEADER;
+                                putsUSBUSART("GET PAYLOAD\r\n");
+                            }
+                        }
+                        else if (dataType == PAYLOAD){
+                            strncpy(payloadBuffer, readBuffer, dataLength);
+                            payloadBuffer[dataLength] = '\0';
+                            STATE = GET_HEADER;
+                            sprintf(readBuffer, "PAYLOAD: %s\n\rGET CHECKSUM\n\r", payloadBuffer);
+                            putsUSBUSART(readBuffer);
+                        }
+                        else if (dataType == CHECKSUM){
+                            strncpy(checksumBuffer, readBuffer, dataLength);
+                            checksumBuffer[dataLength] = '\0';
+                            sprintf(readBuffer, "CHECKSUM: %s\n\rDONE\n\r", checksumBuffer);
+                            putsUSBUSART(readBuffer);
                             STATE = SE_HEADER;
                         }
-                        else{
-                            STATE = DEST_LENGTH;
-                        }
                     }
-                    break;       
+                    break;
+                    
             }
         }
         
-        
-//        putUSBUSART(USB_Out_Buffer, LastRS232Out);
         
         RS232_Out_Data_Rdy = 0;
     }
