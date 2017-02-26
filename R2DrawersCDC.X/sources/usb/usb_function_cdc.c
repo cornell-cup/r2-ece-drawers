@@ -339,7 +339,7 @@ void USBCheckCDCRequest(void)
 void CDCInitEP(void)
 {
    	//Abstract line coding information
-   	line_coding.dwDTERate.Val = 19200;      // baud rate
+   	line_coding.dwDTERate.Val = BAUD_RATE;      // baud rate
    	line_coding.bCharFormat = 0x00;             // 1 stop bit
    	line_coding.bParityType = 0x00;             // None
    	line_coding.bDataBits = 0x08;               // 5,6,7,8, or 16

@@ -114,6 +114,8 @@
     #define INPUT_PIN 1
     #define OUTPUT_PIN 0
 
+    #define BAUD_RATE   115200
+
 
 
 #endif  //HARDWARE_PROFILE_H

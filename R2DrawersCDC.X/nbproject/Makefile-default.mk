@@ -51,17 +51,17 @@ OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 DISTDIR=dist/${CND_CONF}/${IMAGE_TYPE}
 
 # Source Files Quoted if spaced
-SOURCEFILES_QUOTED_IF_SPACED=sources/main.c sources/usb/usb_descriptors.c sources/usb/usb_device.c sources/usb/usb_function_cdc.c
+SOURCEFILES_QUOTED_IF_SPACED=sources/main.c sources/usb/usb_descriptors.c sources/usb/usb_device.c sources/usb/usb_function_cdc.c sources/usb_main.c
 
 # Object Files Quoted if spaced
-OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/sources/main.o ${OBJECTDIR}/sources/usb/usb_descriptors.o ${OBJECTDIR}/sources/usb/usb_device.o ${OBJECTDIR}/sources/usb/usb_function_cdc.o
-POSSIBLE_DEPFILES=${OBJECTDIR}/sources/main.o.d ${OBJECTDIR}/sources/usb/usb_descriptors.o.d ${OBJECTDIR}/sources/usb/usb_device.o.d ${OBJECTDIR}/sources/usb/usb_function_cdc.o.d
+OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/sources/main.o ${OBJECTDIR}/sources/usb/usb_descriptors.o ${OBJECTDIR}/sources/usb/usb_device.o ${OBJECTDIR}/sources/usb/usb_function_cdc.o ${OBJECTDIR}/sources/usb_main.o
+POSSIBLE_DEPFILES=${OBJECTDIR}/sources/main.o.d ${OBJECTDIR}/sources/usb/usb_descriptors.o.d ${OBJECTDIR}/sources/usb/usb_device.o.d ${OBJECTDIR}/sources/usb/usb_function_cdc.o.d ${OBJECTDIR}/sources/usb_main.o.d
 
 # Object Files
-OBJECTFILES=${OBJECTDIR}/sources/main.o ${OBJECTDIR}/sources/usb/usb_descriptors.o ${OBJECTDIR}/sources/usb/usb_device.o ${OBJECTDIR}/sources/usb/usb_function_cdc.o
+OBJECTFILES=${OBJECTDIR}/sources/main.o ${OBJECTDIR}/sources/usb/usb_descriptors.o ${OBJECTDIR}/sources/usb/usb_device.o ${OBJECTDIR}/sources/usb/usb_function_cdc.o ${OBJECTDIR}/sources/usb_main.o
 
 # Source Files
-SOURCEFILES=sources/main.c sources/usb/usb_descriptors.c sources/usb/usb_device.c sources/usb/usb_function_cdc.c
+SOURCEFILES=sources/main.c sources/usb/usb_descriptors.c sources/usb/usb_device.c sources/usb/usb_function_cdc.c sources/usb_main.c
 
 
 CFLAGS=
@@ -124,6 +124,12 @@ ${OBJECTDIR}/sources/usb/usb_function_cdc.o: sources/usb/usb_function_cdc.c  nbp
 	@${RM} ${OBJECTDIR}/sources/usb/usb_function_cdc.o 
 	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_function_cdc.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_function_cdc.o.d" -o ${OBJECTDIR}/sources/usb/usb_function_cdc.o sources/usb/usb_function_cdc.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
 	
+${OBJECTDIR}/sources/usb_main.o: sources/usb_main.c  nbproject/Makefile-${CND_CONF}.mk
+	@${MKDIR} "${OBJECTDIR}/sources" 
+	@${RM} ${OBJECTDIR}/sources/usb_main.o.d 
+	@${RM} ${OBJECTDIR}/sources/usb_main.o 
+	@${FIXDEPS} "${OBJECTDIR}/sources/usb_main.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb_main.o.d" -o ${OBJECTDIR}/sources/usb_main.o sources/usb_main.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
+	
 else
 ${OBJECTDIR}/sources/main.o: sources/main.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}/sources" 
@@ -148,6 +154,12 @@ ${OBJECTDIR}/sources/usb/usb_function_cdc.o: sources/usb/usb_function_cdc.c  nbp
 	@${RM} ${OBJECTDIR}/sources/usb/usb_function_cdc.o.d 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_function_cdc.o 
 	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_function_cdc.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_function_cdc.o.d" -o ${OBJECTDIR}/sources/usb/usb_function_cdc.o sources/usb/usb_function_cdc.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
+	
+${OBJECTDIR}/sources/usb_main.o: sources/usb_main.c  nbproject/Makefile-${CND_CONF}.mk
+	@${MKDIR} "${OBJECTDIR}/sources" 
+	@${RM} ${OBJECTDIR}/sources/usb_main.o.d 
+	@${RM} ${OBJECTDIR}/sources/usb_main.o 
+	@${FIXDEPS} "${OBJECTDIR}/sources/usb_main.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb_main.o.d" -o ${OBJECTDIR}/sources/usb_main.o sources/usb_main.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
 	
 endif
 

@@ -15,6 +15,7 @@
       <itemPath>includes/usb/usb_hal.h</itemPath>
       <itemPath>includes/usb/usb_hal_pic32.h</itemPath>
       <itemPath>includes/usb/usb_device_local.h</itemPath>
+      <itemPath>includes/usb_main.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -27,6 +28,7 @@
       <itemPath>sources/usb/usb_descriptors.c</itemPath>
       <itemPath>sources/usb/usb_device.c</itemPath>
       <itemPath>sources/usb/usb_function_cdc.c</itemPath>
+      <itemPath>sources/usb_main.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
@@ -277,6 +279,7 @@
         <property key="ToolFirmwareFilePath"
                   value="Press to browse for a specific firmware version"/>
         <property key="ToolFirmwareOption.UseLatestFirmware" value="true"/>
+        <property key="firmware.download.all" value="false"/>
         <property key="memories.configurationmemory" value="true"/>
         <property key="memories.dataflash" value="true"/>
         <property key="memories.eeprom" value="true"/>
