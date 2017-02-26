@@ -87,10 +87,6 @@ void YourLowPriorityISRCode();
 void USBCBSendResume(void);
 void BlinkUSBStatus(void);
 void UserInit(void);
-void InitializeUSART(void);
-void putcUSART(char c);
-unsigned char getcUSART ();
-
 /******************************************************************************
  * Function:        void main(void)
  *
