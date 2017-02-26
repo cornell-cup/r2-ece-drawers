@@ -1,0 +1,18 @@
+﻿
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+# On branch usbcdc
+# Your branch is ahead of 'origin/usbcdc' by 1 commit.
+#   (use "git push" to publish your local commits)
+#
+# Changes to be committed:
+#	modified:   R2DrawersCDC.X/build/default/production/sources/main.o
+#	modified:   R2DrawersCDC.X/dist/default/production/R2DrawersCDC.X.production.elf
+#	modified:   R2DrawersCDC.X/dist/default/production/R2DrawersCDC.X.production.hex
+#	modified:   R2DrawersCDC.X/dist/default/production/R2DrawersCDC.X.production.map
+#	modified:   R2DrawersCDC.X/includes/HardwareProfile.h
+#	modified:   R2DrawersCDC.X/sources/main.c
+#
+
+First commit. Changed some definitions to remove non-PIC32-specific stuff.
+Also added PLL oscillator configurations. Removed physical UART stuff.

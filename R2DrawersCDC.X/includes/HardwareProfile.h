@@ -103,11 +103,11 @@
     #define mLED_4_Toggle()     mLED_4 = !mLED_4;
     
     /** SWITCH *********************************************************/
-    #define mInitSwitch2()      TRISAbits.TRISA2=1;
-    #define mInitSwitch3()      TRISAbits.TRISA3=1;
+    #define mInitSwitch2()      TRISBbits.TRISB8=1;
+    #define mInitSwitch3()      TRISBbits.TRISB9=1;
     #define mInitAllSwitches()  mInitSwitch2();mInitSwitch3();
-    #define sw2                 PORTAbits.RA2
-    #define sw3                 PORTAbits.RA3    
+    #define sw2                 PORTBbits.RB8
+    #define sw3                 PORTBbits.RB9    
 
     /** I/O pin definitions ********************************************/
     #define INPUT_PIN 1

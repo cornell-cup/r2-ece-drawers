@@ -51,9 +51,10 @@
 #include "../includes/usb/usb_function_cdc.h"
 #include "../includes/HardwareProfile.h"
 
-#pragma config FNOSC = FRCPLL, POSCMOD = OFF, FSOSCEN = OFF, OSCIOFNC = OFF
+#pragma config FNOSC = PRIPLL, POSCMOD = HS, FSOSCEN = OFF, OSCIOFNC = OFF
 #pragma config FPLLIDIV = DIV_2, FPLLMUL = MUL_20, FPBDIV = DIV_1, FPLLODIV = DIV_2
 #pragma config FWDTEN = OFF, JTAGEN = OFF
+#pragma config UPLLIDIV = DIV_2, UPLLEN = ON
 
 /** I N C L U D E S **********************************************************/
 
@@ -407,38 +408,6 @@ void ProcessIO(void)
 		}
 	}
 
-//    //Check if one or more bytes are waiting in the physical UART transmit
-//    //queue.  If so, send it out the UART TX pin.
-//	if(RS232_Out_Data_Rdy && mTxRdyUSART())
-//	{
-//    	#if defined(USB_CDC_SUPPORT_HARDWARE_FLOW_CONTROL)
-//        	//Make sure the receiving UART device is ready to receive data before 
-//        	//actually sending it.
-//        	if(UART_CTS == USB_CDC_CTS_ACTIVE_LEVEL)
-//        	{
-//        		putcUSART(RS232_Out_Data[RS232cp]);
-//        		++RS232cp;
-//        		if (RS232cp == LastRS232Out)
-//        			RS232_Out_Data_Rdy = 0;
-//    	    }
-//	    #else
-//	        //Hardware flow control not being used.  Just send the data.
-//    		putcUSART(RS232_Out_Data[RS232cp]);
-//    		++RS232cp;
-//    		if (RS232cp == LastRS232Out)
-//    			RS232_Out_Data_Rdy = 0;	    
-//	    #endif
-//	}
-//
-//    //Check if we received a character over the physical UART, and we need
-//    //to buffer it up for eventual transmission to the USB host.
-//	if(mDataRdyUSART() && (NextUSBOut < (CDC_DATA_OUT_EP_SIZE - 1)))
-//	{
-//		USB_Out_Buffer[NextUSBOut] = getcUSART();
-//		++NextUSBOut;
-//		USB_Out_Buffer[NextUSBOut] = 0;
-//	}
-	
 	#if defined(USB_CDC_SUPPORT_HARDWARE_FLOW_CONTROL)
     	//Drive RTS pin, to let UART device attached know if it is allowed to 
     	//send more data or not.  If the receive buffer is almost full, we 
