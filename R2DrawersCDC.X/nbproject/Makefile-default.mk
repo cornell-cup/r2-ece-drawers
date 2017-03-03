@@ -38,12 +38,6 @@ DEBUGGABLE_SUFFIX=elf
 FINAL_IMAGE=dist/${CND_CONF}/${IMAGE_TYPE}/R2DrawersCDC.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX}
 endif
 
-ifeq ($(COMPARE_BUILD), true)
-COMPARISON_BUILD=
-else
-COMPARISON_BUILD=
-endif
-
 # Object Directory
 OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 
@@ -104,62 +98,62 @@ ${OBJECTDIR}/sources/main.o: sources/main.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}/sources" 
 	@${RM} ${OBJECTDIR}/sources/main.o.d 
 	@${RM} ${OBJECTDIR}/sources/main.o 
-	@${FIXDEPS} "${OBJECTDIR}/sources/main.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/main.o.d" -o ${OBJECTDIR}/sources/main.o sources/main.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
+	@${FIXDEPS} "${OBJECTDIR}/sources/main.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/main.o.d" -o ${OBJECTDIR}/sources/main.o sources/main.c     
 	
 ${OBJECTDIR}/sources/usb/usb_descriptors.o: sources/usb/usb_descriptors.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}/sources/usb" 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_descriptors.o.d 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_descriptors.o 
-	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_descriptors.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_descriptors.o.d" -o ${OBJECTDIR}/sources/usb/usb_descriptors.o sources/usb/usb_descriptors.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
+	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_descriptors.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_descriptors.o.d" -o ${OBJECTDIR}/sources/usb/usb_descriptors.o sources/usb/usb_descriptors.c     
 	
 ${OBJECTDIR}/sources/usb/usb_device.o: sources/usb/usb_device.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}/sources/usb" 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_device.o.d 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_device.o 
-	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_device.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_device.o.d" -o ${OBJECTDIR}/sources/usb/usb_device.o sources/usb/usb_device.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
+	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_device.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_device.o.d" -o ${OBJECTDIR}/sources/usb/usb_device.o sources/usb/usb_device.c     
 	
 ${OBJECTDIR}/sources/usb/usb_function_cdc.o: sources/usb/usb_function_cdc.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}/sources/usb" 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_function_cdc.o.d 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_function_cdc.o 
-	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_function_cdc.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_function_cdc.o.d" -o ${OBJECTDIR}/sources/usb/usb_function_cdc.o sources/usb/usb_function_cdc.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
+	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_function_cdc.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_function_cdc.o.d" -o ${OBJECTDIR}/sources/usb/usb_function_cdc.o sources/usb/usb_function_cdc.c     
 	
 ${OBJECTDIR}/sources/usb_main.o: sources/usb_main.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}/sources" 
 	@${RM} ${OBJECTDIR}/sources/usb_main.o.d 
 	@${RM} ${OBJECTDIR}/sources/usb_main.o 
-	@${FIXDEPS} "${OBJECTDIR}/sources/usb_main.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb_main.o.d" -o ${OBJECTDIR}/sources/usb_main.o sources/usb_main.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
+	@${FIXDEPS} "${OBJECTDIR}/sources/usb_main.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb_main.o.d" -o ${OBJECTDIR}/sources/usb_main.o sources/usb_main.c     
 	
 else
 ${OBJECTDIR}/sources/main.o: sources/main.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}/sources" 
 	@${RM} ${OBJECTDIR}/sources/main.o.d 
 	@${RM} ${OBJECTDIR}/sources/main.o 
-	@${FIXDEPS} "${OBJECTDIR}/sources/main.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/main.o.d" -o ${OBJECTDIR}/sources/main.o sources/main.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
+	@${FIXDEPS} "${OBJECTDIR}/sources/main.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/main.o.d" -o ${OBJECTDIR}/sources/main.o sources/main.c     
 	
 ${OBJECTDIR}/sources/usb/usb_descriptors.o: sources/usb/usb_descriptors.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}/sources/usb" 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_descriptors.o.d 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_descriptors.o 
-	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_descriptors.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_descriptors.o.d" -o ${OBJECTDIR}/sources/usb/usb_descriptors.o sources/usb/usb_descriptors.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
+	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_descriptors.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_descriptors.o.d" -o ${OBJECTDIR}/sources/usb/usb_descriptors.o sources/usb/usb_descriptors.c     
 	
 ${OBJECTDIR}/sources/usb/usb_device.o: sources/usb/usb_device.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}/sources/usb" 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_device.o.d 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_device.o 
-	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_device.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_device.o.d" -o ${OBJECTDIR}/sources/usb/usb_device.o sources/usb/usb_device.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
+	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_device.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_device.o.d" -o ${OBJECTDIR}/sources/usb/usb_device.o sources/usb/usb_device.c     
 	
 ${OBJECTDIR}/sources/usb/usb_function_cdc.o: sources/usb/usb_function_cdc.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}/sources/usb" 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_function_cdc.o.d 
 	@${RM} ${OBJECTDIR}/sources/usb/usb_function_cdc.o 
-	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_function_cdc.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_function_cdc.o.d" -o ${OBJECTDIR}/sources/usb/usb_function_cdc.o sources/usb/usb_function_cdc.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
+	@${FIXDEPS} "${OBJECTDIR}/sources/usb/usb_function_cdc.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb/usb_function_cdc.o.d" -o ${OBJECTDIR}/sources/usb/usb_function_cdc.o sources/usb/usb_function_cdc.c     
 	
 ${OBJECTDIR}/sources/usb_main.o: sources/usb_main.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}/sources" 
 	@${RM} ${OBJECTDIR}/sources/usb_main.o.d 
 	@${RM} ${OBJECTDIR}/sources/usb_main.o 
-	@${FIXDEPS} "${OBJECTDIR}/sources/usb_main.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb_main.o.d" -o ${OBJECTDIR}/sources/usb_main.o sources/usb_main.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD) 
+	@${FIXDEPS} "${OBJECTDIR}/sources/usb_main.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/sources/usb_main.o.d" -o ${OBJECTDIR}/sources/usb_main.o sources/usb_main.c     
 	
 endif
 
@@ -174,12 +168,12 @@ endif
 ifeq ($(TYPE_IMAGE), DEBUG_RUN)
 dist/${CND_CONF}/${IMAGE_TYPE}/R2DrawersCDC.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX}: ${OBJECTFILES}  nbproject/Makefile-${CND_CONF}.mk    
 	@${MKDIR} dist/${CND_CONF}/${IMAGE_TYPE} 
-	${MP_CC} $(MP_EXTRA_LD_PRE)  -mdebugger -D__MPLAB_DEBUGGER_PK3=1 -mprocessor=$(MP_PROCESSOR_OPTION)  -o dist/${CND_CONF}/${IMAGE_TYPE}/R2DrawersCDC.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX} ${OBJECTFILES_QUOTED_IF_SPACED}          -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD)    -mreserve=boot@0x1FC00490:0x1FC00BEF  -Wl,--defsym=__MPLAB_BUILD=1$(MP_EXTRA_LD_POST)$(MP_LINKER_FILE_OPTION),--defsym=__MPLAB_DEBUG=1,--defsym=__DEBUG=1,--defsym=__MPLAB_DEBUGGER_PK3=1,-Map="${DISTDIR}/${PROJECTNAME}.${IMAGE_TYPE}.map"
+	${MP_CC} $(MP_EXTRA_LD_PRE)  -mdebugger -D__MPLAB_DEBUGGER_PK3=1 -mprocessor=$(MP_PROCESSOR_OPTION)  -o dist/${CND_CONF}/${IMAGE_TYPE}/R2DrawersCDC.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX} ${OBJECTFILES_QUOTED_IF_SPACED}              -mreserve=boot@0x1FC00490:0x1FC00BEF  -Wl,--defsym=__MPLAB_BUILD=1$(MP_EXTRA_LD_POST)$(MP_LINKER_FILE_OPTION),--defsym=__MPLAB_DEBUG=1,--defsym=__DEBUG=1,--defsym=__MPLAB_DEBUGGER_PK3=1,-Map="${DISTDIR}/${PROJECTNAME}.${IMAGE_TYPE}.map",--memorysummary,dist/${CND_CONF}/${IMAGE_TYPE}/memoryfile.xml
 	
 else
 dist/${CND_CONF}/${IMAGE_TYPE}/R2DrawersCDC.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX}: ${OBJECTFILES}  nbproject/Makefile-${CND_CONF}.mk   
 	@${MKDIR} dist/${CND_CONF}/${IMAGE_TYPE} 
-	${MP_CC} $(MP_EXTRA_LD_PRE)  -mprocessor=$(MP_PROCESSOR_OPTION)  -o dist/${CND_CONF}/${IMAGE_TYPE}/R2DrawersCDC.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX} ${OBJECTFILES_QUOTED_IF_SPACED}          -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD)  -Wl,--defsym=__MPLAB_BUILD=1$(MP_EXTRA_LD_POST)$(MP_LINKER_FILE_OPTION),-Map="${DISTDIR}/${PROJECTNAME}.${IMAGE_TYPE}.map"
+	${MP_CC} $(MP_EXTRA_LD_PRE)  -mprocessor=$(MP_PROCESSOR_OPTION)  -o dist/${CND_CONF}/${IMAGE_TYPE}/R2DrawersCDC.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX} ${OBJECTFILES_QUOTED_IF_SPACED}            -Wl,--defsym=__MPLAB_BUILD=1$(MP_EXTRA_LD_POST)$(MP_LINKER_FILE_OPTION),-Map="${DISTDIR}/${PROJECTNAME}.${IMAGE_TYPE}.map",--memorysummary,dist/${CND_CONF}/${IMAGE_TYPE}/memoryfile.xml
 	${MP_CC_DIR}\\xc32-bin2hex dist/${CND_CONF}/${IMAGE_TYPE}/R2DrawersCDC.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX} 
 endif
 

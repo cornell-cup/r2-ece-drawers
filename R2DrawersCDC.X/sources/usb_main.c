@@ -122,20 +122,21 @@ void ProcessIO(void)
     if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady()){
         memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
         
-        enum states { SE_HEADER, GET_START, SOURCE_LENGTH, SOURCE_DATA,
-                        DEST_LENGTH, DEST_DATA, 
+        enum states {   GET_START,
                         GET_HEADER, GET_LENGTH, GET_DATA, 
-                        SE_FOOTER, GET_END};
-        enum dataTypes { START='b', SOURCE='s', DESTINATION='d', PAYLOAD='p', CHECKSUM='k' };
+                        GET_END};
+        enum dataTypes { START='b', SOURCE='s', DESTINATION='d', 
+                         TRANSACTION='t', PAYLOAD='p', CHECKSUM='k',
+                         END = 'e'};
         
-        static uint8_t STATE = SE_HEADER;
+        static uint8_t STATE = GET_START;
         static uint8_t dataType = START;
         
-        char START_TEXT[] = "00";
-        char SELF[] = "DRWR01";
-        char dataSource[30];
-        char payloadBuffer[30];
-        char checksumBuffer[30];
+        char SELF[] = WHOAMI;
+        char sourceBuffer[30] = {0};
+        char payloadBuffer[30] = {0};
+        char checksumBuffer[30] = {0};
+        char transactionBuffer[30] = {0};
         
         int i;
         
@@ -144,56 +145,41 @@ void ProcessIO(void)
             uint8_t requiredType;
             
             switch (STATE){
-                case SE_HEADER:
+                case GET_START:
                     dataType = START;
                     if (c == 'G'){
                         arrayIndex = 0;
-                        dataLength = 2;
-                        STATE = GET_START;
-                        putsUSBUSART("START\n\r");
-                    }
-                    break;
-                case GET_START:
-                    if (c != START_TEXT[arrayIndex++]){
-                        // Wrong data... Retry from beginning.
-                        STATE = SE_HEADER;
-                        putsUSBUSART("WRONG\n\r");
-                    }
-                    else{
-                        // Right data. Check if correct number received.
-                        if (arrayIndex == dataLength){
-                            STATE = GET_HEADER;
-                            putsUSBUSART("GET HEADER\n\r");
-                        }
+                        STATE = GET_HEADER;
                     }
                     break;
                 case GET_HEADER:
                     if (dataType == START) requiredType = SOURCE;
                     else if (dataType == SOURCE) requiredType = DESTINATION;
-                    else if (dataType == DESTINATION) requiredType = PAYLOAD;
+                    else if (dataType == DESTINATION) requiredType = TRANSACTION;
+                    else if (dataType == TRANSACTION) requiredType = PAYLOAD;
                     else if (dataType == PAYLOAD) requiredType = CHECKSUM;
+                    else if (dataType == CHECKSUM) requiredType = END;
                     
                     if (c == 'S') c = SOURCE;
                     else if (c == 'D') c = DESTINATION;
+                    else if (c == 'T') c = TRANSACTION;
                     else if (c == 'P') c = PAYLOAD;
                     else if (c == 'K') c = CHECKSUM;
+                    else if (c == 'E') c = END;
                     
                     if (requiredType == c){
                         dataType = requiredType;
                     }
                     else {
-                        STATE = SE_HEADER;
+                        STATE = GET_START;
                         break;
                     }
-                    putsUSBUSART("GET LENGTH\n\r");
                     STATE = GET_LENGTH;
                     break;
                 case GET_LENGTH:
-                    dataLength = c - '0';
+                    dataLength = c-'0';
                     if (dataLength < 0) dataLength = 0;
-                    if (dataLength > 9) dataLength = 9;
-                    sprintf(readBuffer, "GET DATA: %d [%c]\n\r", dataLength, dataType);
-                    putsUSBUSART(readBuffer);
+                    if (dataLength > MAX_LENGTH) dataLength = MAX_LENGTH;
                     arrayIndex = 0;
                     STATE = GET_DATA;
                     break;
@@ -201,41 +187,49 @@ void ProcessIO(void)
                     readBuffer[arrayIndex++] = c;
                     if (arrayIndex == dataLength){
                         if (dataType == SOURCE){
-                            strncpy(dataSource, readBuffer, dataLength);
-                            dataSource[dataLength] = '\0';
+                            memcpy(sourceBuffer, readBuffer, dataLength);
+                            sourceBuffer[dataLength] = '\0';
                             STATE = GET_HEADER;
-                            sprintf(readBuffer, "DATA: %s\n\r", dataSource);
-                            putsUSBUSART(readBuffer);
                         }
                         else if (dataType == DESTINATION){
                             readBuffer[dataLength] = '\0';
                             if (strcmp(readBuffer, SELF)){
                                 // not aimed at self
-                                STATE = SE_HEADER;
-                                putsUSBUSART("NOT SELF\r\n");
+                                STATE = GET_START;
                             }
                             else{
                                 STATE = GET_HEADER;
-                                putsUSBUSART("GET PAYLOAD\r\n");
                             }
+                        }
+                        else if (dataType == TRANSACTION){
+                            memcpy(transactionBuffer, readBuffer, dataLength);
+                            transactionBuffer[dataLength] = '\0';
+                            STATE = GET_HEADER;
                         }
                         else if (dataType == PAYLOAD){
                             strncpy(payloadBuffer, readBuffer, dataLength);
                             payloadBuffer[dataLength] = '\0';
                             STATE = GET_HEADER;
-                            sprintf(readBuffer, "PAYLOAD: %s\n\rGET CHECKSUM\n\r", payloadBuffer);
-                            putsUSBUSART(readBuffer);
                         }
                         else if (dataType == CHECKSUM){
                             strncpy(checksumBuffer, readBuffer, dataLength);
                             checksumBuffer[dataLength] = '\0';
-                            sprintf(readBuffer, "CHECKSUM: %s\n\rDONE\n\r", checksumBuffer);
-                            putsUSBUSART(readBuffer);
-                            STATE = SE_HEADER;
+                                    
+                            STATE = GET_END;
                         }
                     }
                     break;
-                    
+                case GET_END:
+                    if (c == 'E'){
+                        // valid data packet
+                        sprintf(readBuffer, 
+                                    "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
+                                        sourceBuffer, transactionBuffer,
+                                            payloadBuffer, checksumBuffer);
+                        putsUSBUSART(readBuffer);
+                    }
+                    STATE = GET_START;
+                    break;
             }
         }
         
@@ -246,17 +240,6 @@ void ProcessIO(void)
     CDCTxService();
 
 }//end ProcessIO
-
-void loadBuffer(uint8_t* copyBuffer, uint16_t copyLength){
-    int i;
-    for (i=0; i<copyLength; i++){
-        readBuffer[writeIndex] = copyBuffer[i];
-        writeIndex++;
-        if (writeIndex >= BUFFER_LENGTH){
-            writeIndex = 0;
-        }
-    }
-}
 
 /******************************************************************************
  * Function:        void mySetLineCodingHandler(void)

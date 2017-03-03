@@ -114,7 +114,15 @@
     #define INPUT_PIN 1
     #define OUTPUT_PIN 0
 
-    #define BAUD_RATE   115200
+    #define BAUD_RATE                   115200
+    #define MAX_LENGTH                  9
+    #define MAXLENGTH_SOURCE            MAX_LENGTH
+    #define MAXLENGTH_DESTINATION       MAX_LENGTH
+    #define MAXLENGTH_TRANSACTION       MAX_LENGTH
+    #define MAXLENGTH_PAYLOAD           MAX_LENGTH
+    #define MAXLENGTH_CHECKSUM          MAX_LENGTH
+
+    #define WHOAMI                      "DRAWER01"
 
 
 
