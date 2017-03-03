@@ -125,9 +125,9 @@ void ProcessIO(void)
         enum states {   GET_START,
                         GET_HEADER, GET_LENGTH, GET_DATA, 
                         GET_END};
-        enum dataTypes { START='b', SOURCE='s', DESTINATION='d', 
-                         TRANSACTION='t', PAYLOAD='p', CHECKSUM='k',
-                         END = 'e'};
+        enum dataTypes { START='b', SOURCE, DESTINATION, 
+                         TRANSACTION, PAYLOAD, CHECKSUM,
+                         END};
         
         static uint8_t STATE = GET_START;
         static uint8_t dataType = START;
@@ -153,12 +153,7 @@ void ProcessIO(void)
                     }
                     break;
                 case GET_HEADER:
-                    if (dataType == START) requiredType = SOURCE;
-                    else if (dataType == SOURCE) requiredType = DESTINATION;
-                    else if (dataType == DESTINATION) requiredType = TRANSACTION;
-                    else if (dataType == TRANSACTION) requiredType = PAYLOAD;
-                    else if (dataType == PAYLOAD) requiredType = CHECKSUM;
-                    else if (dataType == CHECKSUM) requiredType = END;
+                    requiredType = dataType + 1;
                     
                     if (c == 'S') c = SOURCE;
                     else if (c == 'D') c = DESTINATION;
@@ -207,14 +202,14 @@ void ProcessIO(void)
                             STATE = GET_HEADER;
                         }
                         else if (dataType == PAYLOAD){
-                            strncpy(payloadBuffer, readBuffer, dataLength);
+                            memcpy(payloadBuffer, readBuffer, dataLength);
                             payloadBuffer[dataLength] = '\0';
                             STATE = GET_HEADER;
                         }
                         else if (dataType == CHECKSUM){
-                            strncpy(checksumBuffer, readBuffer, dataLength);
+                            memcpy(checksumBuffer, readBuffer, dataLength);
                             checksumBuffer[dataLength] = '\0';
-                                    
+                            
                             STATE = GET_END;
                         }
                     }
