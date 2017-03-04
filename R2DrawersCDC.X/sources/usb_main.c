@@ -75,9 +75,6 @@ void BlinkUSBStatus(void);
 void UserInit(void);
 
 void loadBuffer(uint8_t* copyBuffer, uint16_t copyLength);
-
-volatile int arrayIndex = 0;
-volatile int dataLength = 0;
         
         
 /********************************************************************
@@ -122,16 +119,20 @@ void ProcessIO(void)
     if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady()){
         memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
         
-        enum states {   GET_START,
+        enum states {   GET_START_PREFIX, GET_START,
                         GET_HEADER, GET_LENGTH, GET_DATA, 
-                        GET_END};
+                        GET_END_PREFIX, GET_END};
         enum dataTypes { START='b', SOURCE, DESTINATION, 
                          TRANSACTION, PAYLOAD, CHECKSUM,
                          END};
         
-        static uint8_t STATE = GET_START;
+        static uint8_t STATE = GET_START_PREFIX;
         static uint8_t dataType = START;
+        static int dataLength = 0;
+        static int arrayIndex = 0;
         
+        char START_TEXT[] = "00";
+        char END_TEXT[] = "01";
         char SELF[] = WHOAMI;
         char sourceBuffer[30] = {0};
         char payloadBuffer[30] = {0};
@@ -145,10 +146,21 @@ void ProcessIO(void)
             uint8_t requiredType;
             
             switch (STATE){
-                case GET_START:
+                case GET_START_PREFIX:
                     dataType = START;
                     if (c == 'G'){
                         arrayIndex = 0;
+                        STATE = GET_START;
+                        dataLength = 2;
+                    }
+                    break;
+                case GET_START:
+                    if (c != START_TEXT[arrayIndex]){
+                        STATE = GET_START_PREFIX;
+                        break;
+                    }
+                    arrayIndex++;
+                    if (arrayIndex == dataLength){
                         STATE = GET_HEADER;
                     }
                     break;
@@ -164,12 +176,11 @@ void ProcessIO(void)
                     
                     if (requiredType == c){
                         dataType = requiredType;
+                        STATE = GET_LENGTH;
                     }
                     else {
-                        STATE = GET_START;
-                        break;
+                        STATE = GET_START_PREFIX;
                     }
-                    STATE = GET_LENGTH;
                     break;
                 case GET_LENGTH:
                     dataLength = c-'0';
@@ -177,6 +188,8 @@ void ProcessIO(void)
                     if (dataLength > MAX_LENGTH) dataLength = MAX_LENGTH;
                     arrayIndex = 0;
                     STATE = GET_DATA;
+//                    sprintf(readBuffer, "data length = %d\n\r", dataLength);
+//                    putsUSBUSART(readBuffer);
                     break;
                 case GET_DATA:
                     readBuffer[arrayIndex++] = c;
@@ -185,45 +198,66 @@ void ProcessIO(void)
                             memcpy(sourceBuffer, readBuffer, dataLength);
                             sourceBuffer[dataLength] = '\0';
                             STATE = GET_HEADER;
+//                            putsUSBUSART("source data\n\r");
                         }
                         else if (dataType == DESTINATION){
                             readBuffer[dataLength] = '\0';
                             if (strcmp(readBuffer, SELF)){
                                 // not aimed at self
-                                STATE = GET_START;
+//                                putsUSBUSART("destination data, wrong\n\r");
+                                STATE = GET_START_PREFIX;
                             }
                             else{
                                 STATE = GET_HEADER;
+//                                putsUSBUSART("destination data, right\n\r");
                             }
                         }
                         else if (dataType == TRANSACTION){
                             memcpy(transactionBuffer, readBuffer, dataLength);
                             transactionBuffer[dataLength] = '\0';
                             STATE = GET_HEADER;
+//                            putsUSBUSART("transaction data\n\r");
                         }
                         else if (dataType == PAYLOAD){
                             memcpy(payloadBuffer, readBuffer, dataLength);
                             payloadBuffer[dataLength] = '\0';
                             STATE = GET_HEADER;
+//                            putsUSBUSART("payload data\n\r");
                         }
                         else if (dataType == CHECKSUM){
                             memcpy(checksumBuffer, readBuffer, dataLength);
                             checksumBuffer[dataLength] = '\0';
-                            
-                            STATE = GET_END;
+//                            putsUSBUSART("checksum data\n\r");
+                            STATE = GET_END_PREFIX;
                         }
                     }
                     break;
-                case GET_END:
+                case GET_END_PREFIX:
+//                    putsUSBUSART("end prefix\n\r");
                     if (c == 'E'){
+                        STATE = GET_END;
+                        arrayIndex = 0;
+                        dataLength = 2;
+                    }
+                    else{
+                        STATE = GET_START_PREFIX;
+                    }
+                    break;
+                case GET_END:
+                    if (c != END_TEXT[arrayIndex]){
+                        STATE = GET_START_PREFIX;
+                        break;
+                    }
+                    arrayIndex++;
+                    if (arrayIndex == dataLength){
                         // valid data packet
                         sprintf(readBuffer, 
                                     "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
                                         sourceBuffer, transactionBuffer,
                                             payloadBuffer, checksumBuffer);
                         putsUSBUSART(readBuffer);
+                        STATE = GET_START_PREFIX;                        
                     }
-                    STATE = GET_START;
                     break;
             }
         }
