@@ -139,6 +139,14 @@ void ProcessIO(void)
         char checksumBuffer[30] = {0};
         char transactionBuffer[30] = {0};
         
+        char symStart = 'G';
+        char symSource = 'S';
+        char symDestination = 'D';
+        char symTransactionId = 'T';
+        char symPayload = 'P';
+        char symChecksum = 'K';
+        char symEnd = 'G';
+        
         int i;
         
         for (i=0; i<LastRS232Out; i++){
@@ -148,7 +156,7 @@ void ProcessIO(void)
             switch (STATE){
                 case GET_START_PREFIX:
                     dataType = START;
-                    if (c == 'G'){
+                    if (c == symStart){
                         arrayIndex = 0;
                         STATE = GET_START;
                         dataLength = 2;
@@ -167,12 +175,12 @@ void ProcessIO(void)
                 case GET_HEADER:
                     requiredType = dataType + 1;
                     
-                    if (c == 'S') c = SOURCE;
-                    else if (c == 'D') c = DESTINATION;
-                    else if (c == 'T') c = TRANSACTION;
-                    else if (c == 'P') c = PAYLOAD;
-                    else if (c == 'K') c = CHECKSUM;
-                    else if (c == 'E') c = END;
+                    if (c == symSource) c = SOURCE;
+                    else if (c == symDestination) c = DESTINATION;
+                    else if (c == symTransactionId) c = TRANSACTION;
+                    else if (c == symPayload) c = PAYLOAD;
+                    else if (c == symChecksum) c = CHECKSUM;
+                    else if (c == symEnd) c = END;
                     
                     if (requiredType == c){
                         dataType = requiredType;
@@ -183,13 +191,14 @@ void ProcessIO(void)
                     }
                     break;
                 case GET_LENGTH:
-                    dataLength = c-'0';
+                    dataLength = c;
+                    #ifdef LENGTH_IN_ASCII
+                        dataLength = dataLength - '0';
+                    #endif
                     if (dataLength < 0) dataLength = 0;
                     if (dataLength > MAX_LENGTH) dataLength = MAX_LENGTH;
                     arrayIndex = 0;
                     STATE = GET_DATA;
-//                    sprintf(readBuffer, "data length = %d\n\r", dataLength);
-//                    putsUSBUSART(readBuffer);
                     break;
                 case GET_DATA:
                     readBuffer[arrayIndex++] = c;
@@ -197,44 +206,37 @@ void ProcessIO(void)
                         if (dataType == SOURCE){
                             memcpy(sourceBuffer, readBuffer, dataLength);
                             sourceBuffer[dataLength] = '\0';
-                            STATE = GET_HEADER;
-//                            putsUSBUSART("source data\n\r");
+                            STATE = GET_HEADER; 
                         }
                         else if (dataType == DESTINATION){
                             readBuffer[dataLength] = '\0';
                             if (strcmp(readBuffer, SELF)){
                                 // not aimed at self
-//                                putsUSBUSART("destination data, wrong\n\r");
                                 STATE = GET_START_PREFIX;
                             }
                             else{
                                 STATE = GET_HEADER;
-//                                putsUSBUSART("destination data, right\n\r");
                             }
                         }
                         else if (dataType == TRANSACTION){
                             memcpy(transactionBuffer, readBuffer, dataLength);
                             transactionBuffer[dataLength] = '\0';
                             STATE = GET_HEADER;
-//                            putsUSBUSART("transaction data\n\r");
                         }
                         else if (dataType == PAYLOAD){
                             memcpy(payloadBuffer, readBuffer, dataLength);
                             payloadBuffer[dataLength] = '\0';
                             STATE = GET_HEADER;
-//                            putsUSBUSART("payload data\n\r");
                         }
                         else if (dataType == CHECKSUM){
                             memcpy(checksumBuffer, readBuffer, dataLength);
                             checksumBuffer[dataLength] = '\0';
-//                            putsUSBUSART("checksum data\n\r");
                             STATE = GET_END_PREFIX;
                         }
                     }
                     break;
                 case GET_END_PREFIX:
-//                    putsUSBUSART("end prefix\n\r");
-                    if (c == 'E'){
+                    if (c == symEnd){
                         STATE = GET_END;
                         arrayIndex = 0;
                         dataLength = 2;
@@ -251,17 +253,16 @@ void ProcessIO(void)
                     arrayIndex++;
                     if (arrayIndex == dataLength){
                         // valid data packet
-                        sprintf(readBuffer, 
+                        sprintf(readBuffer,
                                     "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
                                         sourceBuffer, transactionBuffer,
                                             payloadBuffer, checksumBuffer);
                         putsUSBUSART(readBuffer);
-                        STATE = GET_START_PREFIX;                        
+                        STATE = GET_START_PREFIX;
                     }
                     break;
             }
         }
-        
         
         RS232_Out_Data_Rdy = 0;
     }

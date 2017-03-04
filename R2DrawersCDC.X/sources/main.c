@@ -53,7 +53,7 @@
 
 #pragma config FNOSC = PRIPLL, POSCMOD = HS, FSOSCEN = OFF, OSCIOFNC = OFF
 #pragma config FPLLIDIV = DIV_2, FPLLMUL = MUL_20, FPBDIV = DIV_1, FPLLODIV = DIV_2
-#pragma config FWDTEN = OFF, JTAGEN = OFF
+#pragma config FWDTEN = OFF, JTAGEN = OFF, ICESEL = ICS_PGx3
 #pragma config UPLLIDIV = DIV_2, UPLLEN = ON
 
 /** I N C L U D E S **********************************************************/
