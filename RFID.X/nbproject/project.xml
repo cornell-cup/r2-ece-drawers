@@ -3,8 +3,8 @@
     <type>com.microchip.mplab.nbide.embedded.makeproject</type>
     <configuration>
         <data xmlns="http://www.netbeans.org/ns/make-project/1">
-            <name>R2DrawersCDC</name>
-            <creation-uuid>5fc5208d-2363-4a07-8048-444bc44cb240</creation-uuid>
+            <name>RFID</name>
+            <creation-uuid>f7a18a50-1d58-478a-94f3-dc226e57be32</creation-uuid>
             <make-project-type>0</make-project-type>
             <c-extensions>c</c-extensions>
             <cpp-extensions/>
