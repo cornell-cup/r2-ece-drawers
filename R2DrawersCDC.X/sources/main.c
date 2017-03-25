@@ -63,14 +63,26 @@
 #include "../includes/usb/usb_config.h"
 #include "../includes/usb/usb_device.h"
 
+#define EnablePullUpB(bits) CNPDBCLR=bits; CNPUBSET=bits;
+#define EnablePullUpA(bits) CNPDACLR=bits; CNPUASET=bits;
+
 /** C O M M A N D S ********************************************************/
 #define CMD_OPEN    "O"
 #define CMD_CLOSE   "C"
+#define CMD_TOOLS   "TOOLS"
+#define CMD_RFID    "RFID"
+
+#define PERIOD      50000   // 20 ms
+#define SERVO_MIN   2000    // 1000 us
+#define SERVO_REST  3750    // 1500 us
+#define SERVO_MAX   5000    // 2000 us
+
 /** V A R I A B L E S ********************************************************/
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 static void InitializeSystem(void);
-
+void initPWM(void);
+void setServoSpeed(int speed);
 
 /******************************************************************************
  * Function:        void main(void)
@@ -138,10 +150,16 @@ int main(void)
 //                    sourceBuffer, transactionBuffer,
 //                        payloadBuffer, checksumBuffer);
 //            putsUSBUSART(readBuffer);
-            if (strncmp(payloadBuffer, CMD_OPEN, 5)){
+            if (strncmp(payloadBuffer, CMD_OPEN, 5)==0){
                 
             }
-            else if (strncmp(payloadBuffer, CMD_CLOSE, 5)){
+            else if (strncmp(payloadBuffer, CMD_CLOSE, 5)==0){
+                
+            }
+            else if (strncmp(payloadBuffer, CMD_RFID, 5)==0){
+                
+            }
+            else if (strncmp(payloadBuffer, CMD_TOOLS, 5)==0){
                 
             }
         }
@@ -221,3 +239,22 @@ static void InitializeSystem(void)
 
 
 /** EOF main.c *************************************************/
+
+void initPWM(void){
+    PPSOutput(1, RPB4, OC1);        // pin 11
+    
+    mPORTBSetPinsDigitalOut(BIT_4);
+    
+    // pwm mode, fault pin disabled, timer 2 time base
+    OC1CON = OCCON_ON | OCCON_OCM1 | OCCON_OCM2;
+    
+    // 16-bit timer 2, no interrupt, 1:16 prescale, PR2=50000 -> period = 20ms
+    OpenTimer2(T2_32BIT_MODE_OFF | T2_INT_OFF | T2_PS_1_16 | T2_ON, PERIOD-1);    
+}
+
+
+void setServoSpeed(int speed){
+    if (speed < SERVO_MIN) speed = SERVO_MIN;
+    if (speed > SERVO_MAX) speed = SERVO_MAX;
+    SetDCOC1PWM(speed);
+}
