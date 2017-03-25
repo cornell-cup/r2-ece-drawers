@@ -114,9 +114,21 @@ int main(void)
 
         OpenTimer1(T1_ON | T1_PS_1_256, 0xFFFF);
         
+        char sourceBuffer[30] = {0};
+        char payloadBuffer[30] = {0};
+        char checksumBuffer[30] = {0};
+        char transactionBuffer[30] = {0};
+        
 		// Application-specific tasks.
 		// Application related code may be added here, or in the ProcessIO() function.
-        ProcessIO();        
+        int result = ProcessIO(sourceBuffer, payloadBuffer, checksumBuffer, transactionBuffer);
+        /* the buffers now contain relevant information;
+         * they are updated if result == 1; otherwise, it's old info
+         */
+        
+        
+        
+        
     }//end while
 }//end main
 

@@ -68,7 +68,7 @@ unsigned char RS232_Out_Data_Rdy = 0;
 USB_HANDLE  lastTransmission;
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
-void ProcessIO(void);
+//void ProcessIO(char* sourceBuffer, char* payloadBuffer, char* checksumBuffer, char* transactionBuffer);
 void USBDeviceTasks(void);
 void USBCBSendResume(void);
 void BlinkUSBStatus(void);
@@ -82,9 +82,12 @@ void loadBuffer(uint8_t* copyBuffer, uint16_t copyLength);
  *
  * PreCondition:    None
  *
- * Input:           None
+ * Input:           sourceBuffer 
+ *                  payloadBuffer
+ *                  checksumBuffer
+ *                  transactionBuffer
  *
- * Output:          None
+ * Output:          Returns 1 if new packet. 0 otherwise.
  *
  * Side Effects:    None
  *
@@ -94,8 +97,9 @@ void loadBuffer(uint8_t* copyBuffer, uint16_t copyLength);
  *
  * Note:            None
  *******************************************************************/
-void ProcessIO(void)
-{   
+int ProcessIO(char* sourceBuffer, char* payloadBuffer, char* checksumBuffer, char* transactionBuffer)
+{
+    int result = 0;
     //Blink the LEDs according to the USB device status
     BlinkUSBStatus();
     // User Application USB tasks
@@ -134,10 +138,6 @@ void ProcessIO(void)
         char START_TEXT[] = "00";
         char END_TEXT[] = "01";
         char SELF[] = WHOAMI;
-        char sourceBuffer[30] = {0};
-        char payloadBuffer[30] = {0};
-        char checksumBuffer[30] = {0};
-        char transactionBuffer[30] = {0};
         
         char symStart = 'G';
         char symSource = 'S';
@@ -259,6 +259,7 @@ void ProcessIO(void)
                                             payloadBuffer, checksumBuffer);
                         putsUSBUSART(readBuffer);
                         STATE = GET_START_PREFIX;
+                        result = 1;
                     }
                     break;
             }
@@ -268,6 +269,8 @@ void ProcessIO(void)
     }
 
     CDCTxService();
+    
+    return result;
 
 }//end ProcessIO
 
