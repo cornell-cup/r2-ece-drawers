@@ -102,6 +102,12 @@ void setServoSpeed(int speed);
 
 int main(void)
 {   
+	PPSInput(4, INT1, RPB0);
+	PPSInput(3, INT2, RPA4);
+		
+	ConfigINT1(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+	ConfigINT2(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+	
     InitializeSystem();
 
     #if defined(USB_INTERRUPT)
@@ -109,7 +115,7 @@ int main(void)
     #endif
 
     while(1)
-    {
+    {	
         #if defined(USB_POLLING)
 		// Check bus status and service USB interrupts.
         USBDeviceTasks(); // Interrupt or polling method.  If using polling, must call
@@ -235,6 +241,11 @@ static void InitializeSystem(void)
 
     USBDeviceInit();	//usb_device.c.  Initializes USB module SFRs and firmware
     					//variables to known states.
+	
+	initPWM();
+	EnablePullUpA(BIT_4);
+	EnablePullUpB(BIT_4);
+	
 }//end InitializeSystem
 
 
@@ -249,12 +260,24 @@ void initPWM(void){
     OC1CON = OCCON_ON | OCCON_OCM1 | OCCON_OCM2;
     
     // 16-bit timer 2, no interrupt, 1:16 prescale, PR2=50000 -> period = 20ms
-    OpenTimer2(T2_32BIT_MODE_OFF | T2_INT_OFF | T2_PS_1_16 | T2_ON, PERIOD-1);    
+    OpenTimer2(T2_32BIT_MODE_OFF | T2_INT_OFF | T2_PS_1_16 | T2_ON, PERIOD-1);
+	
+	setServoSpeed(SERVO_REST);
 }
 
 
 void setServoSpeed(int speed){
     if (speed < SERVO_MIN) speed = SERVO_MIN;
     if (speed > SERVO_MAX) speed = SERVO_MAX;
-    SetDCOC1PWM(speed);
+    SetDCOC1PWM(speed);		//RPB4, OC1
+}
+
+void __ISR(_EXTERNAL_1_VECTOR, ipl1) StopOpen(void) { //INT1, RPB0, Front Switch (FR_SW)
+	mINT1ClearIntFlag();
+	setServoSpeed(SERVO_REST);
+}
+
+void __ISR(_EXTERNAL_2_VECTOR, ipl2) StopClose(void) { //INT2, RPA4, Back Switch (BK_SW)
+	mINT2ClearIntFlag();
+	serServoSpeed(SERVO_REST);
 }

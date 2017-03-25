@@ -110,6 +110,9 @@
 //    #define sw2                 PORTBbits.RB8
 //    #define sw3                 PORTBbits.RB9    
 
+	#define EnablePullUpA(bits) CNPDACLR=bits; CNPUASET=bits;
+	#define EnablePullUpB(bits) CNPDBCLR=bits; CNPUBSET=bits;
+
     /** I/O pin definitions ********************************************/
     #define INPUT_PIN 1
     #define OUTPUT_PIN 0
