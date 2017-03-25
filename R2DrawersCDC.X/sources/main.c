@@ -63,6 +63,9 @@
 #include "../includes/usb/usb_config.h"
 #include "../includes/usb/usb_device.h"
 
+/** C O M M A N D S ********************************************************/
+#define CMD_OPEN    "O"
+#define CMD_CLOSE   "C"
 /** V A R I A B L E S ********************************************************/
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
@@ -110,14 +113,13 @@ int main(void)
         				  // function does not take very long to execute (ex: <100 
         				  // instruction cycles) before it returns.
         #endif
-    				  
 
         OpenTimer1(T1_ON | T1_PS_1_256, 0xFFFF);
         
         char sourceBuffer[30] = {0};
+        char transactionBuffer[30] = {0};
         char payloadBuffer[30] = {0};
         char checksumBuffer[30] = {0};
-        char transactionBuffer[30] = {0};
         
 		// Application-specific tasks.
 		// Application related code may be added here, or in the ProcessIO() function.
@@ -126,8 +128,23 @@ int main(void)
          * they are updated if result == 1; otherwise, it's old info
          */
         
-        
-        
+        char readBuffer[100];
+        if (result){
+            // new data available
+            
+//            print out data obtained:
+//            sprintf(readBuffer,
+//                "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
+//                    sourceBuffer, transactionBuffer,
+//                        payloadBuffer, checksumBuffer);
+//            putsUSBUSART(readBuffer);
+            if (strncmp(payloadBuffer, CMD_OPEN, 5)){
+                
+            }
+            else if (strncmp(payloadBuffer, CMD_CLOSE, 5)){
+                
+            }
+        }
         
     }//end while
 }//end main

@@ -253,11 +253,11 @@ int ProcessIO(char* sourceBuffer, char* payloadBuffer, char* checksumBuffer, cha
                     arrayIndex++;
                     if (arrayIndex == dataLength){
                         // valid data packet
-                        sprintf(readBuffer,
-                                    "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
-                                        sourceBuffer, transactionBuffer,
-                                            payloadBuffer, checksumBuffer);
-                        putsUSBUSART(readBuffer);
+//                        sprintf(readBuffer,
+//                                    "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
+//                                        sourceBuffer, transactionBuffer,
+//                                            payloadBuffer, checksumBuffer);
+//                        putsUSBUSART(readBuffer);
                         STATE = GET_START_PREFIX;
                         result = 1;
                     }
