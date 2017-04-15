@@ -156,9 +156,10 @@ int main(void)
             //print out data obtained:
             sprintf(readBuffer,
                 "S: %s%d\n\rT: %s%d\n\rP: %s%d\n\rK: %s%d\n\r",
-                    sourceBuffer, , transactionBuffer, 
+                    sourceBuffer, transactionBuffer, 
                         payloadBuffer, checksumBuffer);
             putsUSBUSART(readBuffer);
+            //add lengths!!!
             
             if (strncmp(payloadBuffer, CMD_OPEN, 5)==0){
                 setServoSpeed(SERVO_OPEN);
@@ -168,6 +169,7 @@ int main(void)
             }
             else if (strncmp(payloadBuffer, CMD_TOOLS, 5)==0){
                 payloadBuffer = getToolStatus();
+                //fix this stuff
             }
         }
         
