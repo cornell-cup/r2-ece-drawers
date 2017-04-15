@@ -69,13 +69,15 @@
 /** C O M M A N D S ********************************************************/
 #define CMD_OPEN    "O"
 #define CMD_CLOSE   "C"
-#define CMD_TOOLS   "TOOLS"
-#define CMD_RFID    "RFID"
+#define CMD_TOOLS   "T"
 
 #define PERIOD      50000   // 20 ms
 #define SERVO_MIN   2000    // 1000 us
 #define SERVO_REST  3750    // 1500 us
 #define SERVO_MAX   5000    // 2000 us
+#define SERVO_RUN_SPEED     100
+#define SERVO_OPEN  (SERVO_REST + SERVO_RUN_SPEED)
+#define SERVO_CLOSE (SERVO_REST - SERVO_RUN_SPEED)
 
 /** V A R I A B L E S ********************************************************/
 
@@ -146,27 +148,26 @@ int main(void)
          * they are updated if result == 1; otherwise, it's old info
          */
         
+        
         char readBuffer[100];
         if (result){
             // new data available
             
-//            print out data obtained:
-//            sprintf(readBuffer,
-//                "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
-//                    sourceBuffer, transactionBuffer,
-//                        payloadBuffer, checksumBuffer);
-//            putsUSBUSART(readBuffer);
+            //print out data obtained:
+            sprintf(readBuffer,
+                "S: %s%d\n\rT: %s%d\n\rP: %s%d\n\rK: %s%d\n\r",
+                    sourceBuffer, , transactionBuffer, 
+                        payloadBuffer, checksumBuffer);
+            putsUSBUSART(readBuffer);
+            
             if (strncmp(payloadBuffer, CMD_OPEN, 5)==0){
-                
+                setServoSpeed(SERVO_OPEN);
             }
             else if (strncmp(payloadBuffer, CMD_CLOSE, 5)==0){
-                
-            }
-            else if (strncmp(payloadBuffer, CMD_RFID, 5)==0){
-                
+                setServoSpeed(SERVO_CLOSE);
             }
             else if (strncmp(payloadBuffer, CMD_TOOLS, 5)==0){
-                
+                payloadBuffer = getToolStatus();
             }
         }
         
@@ -245,6 +246,7 @@ static void InitializeSystem(void)
 	initPWM();
 	EnablePullUpA(BIT_4);
 	EnablePullUpB(BIT_4);
+    initToolStatus();
 	
 }//end InitializeSystem
 
@@ -279,5 +281,28 @@ void __ISR(_EXTERNAL_1_VECTOR, ipl1) StopOpen(void) { //INT1, RPB0, Front Switch
 
 void __ISR(_EXTERNAL_2_VECTOR, ipl2) StopClose(void) { //INT2, RPA4, Back Switch (BK_SW)
 	mINT2ClearIntFlag();
-	serServoSpeed(SERVO_REST);
+	setServoSpeed(SERVO_REST);
 }
+
+void initToolStatus(void) {
+    //Initialize tool switches as digital inputs
+    //SW1 = RB1, SW2 = RB2, SW3 = RB3, SW4 = RB7, SW5 = RB14, SW6 = RB15
+    mPORTBSetPinsDigitalIn(BIT_1, BIT_2, BIT_3, BIT_7, BIT_14, BIT_15);
+}
+
+uint8_t getToolStatus(void) {
+    uint8_t start = 0;
+    uint8_t sw1 =  (mPORTBReadBits(BIT_1)>0)*64;
+    uint8_t sw2 =  (mPORTBReadBits(BIT_2)>0)*32;
+    uint8_t sw3 =  (mPORTBReadBits(BIT_3)>0)*16;
+    uint8_t sw4 =  (mPORTBReadBits(BIT_7)>0)*8;
+    uint8_t sw5 =  (mPORTBReadBits(BIT_14)>0)*4;
+    uint8_t sw6 =  (mPORTBReadBits(BIT_15)>0)*2;
+    uint8_t end = 1;
+
+    uint8_t toolStatus = start + sw1 + sw2 + sw3 + sw4 + sw5 + sw6 + end;
+    return toolStatus;
+}
+
+
+

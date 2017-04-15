@@ -132,7 +132,7 @@ int ProcessIO(char* sourceBuffer, char* payloadBuffer, char* checksumBuffer, cha
         
         static uint8_t STATE = GET_START_PREFIX;
         static uint8_t dataType = START;
-        static int dataLength = 0;
+        static uint32_t dataLength = 0;
         static int arrayIndex = 0;
         
         char START_TEXT[] = "00";
@@ -184,6 +184,13 @@ int ProcessIO(char* sourceBuffer, char* payloadBuffer, char* checksumBuffer, cha
                     
                     if (requiredType == c){
                         dataType = requiredType;
+                        arrayIndex = 0;
+                        if (c == PAYLOAD){
+                            dataLength = 4;
+                        }
+                        else{
+                            dataLength = 1;
+                        }
                         STATE = GET_LENGTH;
                     }
                     else {
@@ -191,14 +198,28 @@ int ProcessIO(char* sourceBuffer, char* payloadBuffer, char* checksumBuffer, cha
                     }
                     break;
                 case GET_LENGTH:
-                    dataLength = c;
-                    #ifdef LENGTH_IN_ASCII
-                        dataLength = dataLength - '0';
-                    #endif
-                    if (dataLength < 0) dataLength = 0;
-                    if (dataLength > MAX_LENGTH) dataLength = MAX_LENGTH;
-                    arrayIndex = 0;
-                    STATE = GET_DATA;
+                    readBuffer[arrayIndex++] = c;
+                    if (arrayIndex == dataLength){
+                        if (dataType == PAYLOAD){
+                            dataLength = ((uint32_t)(readBuffer[3])<<24) | 
+                                    ((uint32_t)(readBuffer[2])<<16) |
+                                    ((uint32_t)(readBuffer[1])<<8) | 
+                                    ((uint32_t)(readBuffer[0]));
+                        }
+                        else{
+                            dataLength = c;
+                        }
+                        arrayIndex = 0;
+                        STATE = GET_DATA;
+                    }
+//                    dataLength = c;
+//                    #ifdef LENGTH_IN_ASCII
+//                        dataLength = dataLength - '0';
+//                    #endif
+//                    if (dataLength < 0) dataLength = 0;
+//                    if (dataLength > MAX_LENGTH) dataLength = MAX_LENGTH;
+//                    arrayIndex = 0;
+//                    STATE = GET_DATA;
                     break;
                 case GET_DATA:
                     readBuffer[arrayIndex++] = c;
