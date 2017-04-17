@@ -168,51 +168,53 @@ int main(void)
                 setServoSpeed(SERVO_CLOSE);
             }
             else if (strncmp(payloadBuffer, CMD_TOOLS, 5)==0){
-                uint32_t dataLength = 1;
-                uint8_t data[dataLength] = {getToolStatus()};
+                sprintf(readBuffer,
+                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
+                    7, "DRAWER1", 2, "D1", 1, getToolStatus(), 2, "CD");
+                putsUSBUSART(readBuffer);
                 
-//                sprintf(readBuffer,
-//                "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
-//                    "DRAWER1", "",  getToolStatus(), "");
-//                putsUSBUSART(readBuffer);
-
-                struct R2ProtocolPacket dataPacket;
-                dataPacket->source = "DRAWER1";
-                dataPacket->destination = "PI";
-                dataPacket->id = "";
-                dataPacket->data_len = dataLength;
-                dataPacket->data = data;
-
-                uint8_t output[256];
-                int len = R2ProtocolEncode(&dataPacket, output, 256);
-
-                if (len >= 0) {
-                    putsUSBUSART(output, len);
-                    CDCTxService();
-                }
+//                uint32_t dataLength = 1;
+//                uint8_t data[dataLength] = {getToolStatus()};
+//
+//                struct R2ProtocolPacket dataPacket;
+//                dataPacket->source = "DRAWER1";
+//                dataPacket->destination = "PI";
+//                dataPacket->id = "";
+//                dataPacket->data_len = dataLength;
+//                dataPacket->data = data;
+//
+//                uint8_t output[256];
+//                int len = R2ProtocolEncode(&dataPacket, output, 256);
+//
+//                if (len >= 0) {
+//                    putsUSBUSART(output, len);
+//                    CDCTxService();
+//                }
             }
-            else if (RFID != 0){
-//                sprintf(readBuffer,
-//                "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
-//                    "DRAWER1", "", RFID, "");
-//                putsUSBUSART(readBuffer);
-                uint32_t dataLength = 10;
-                uint8_t data[dataLength] = {RFID};
-
-                struct R2ProtocolPacket dataPacket;
-                dataPacket->source = "DRAWER1";
-                dataPacket->destination = "PI";
-                dataPacket->id = "";
-                dataPacket->data_len = dataLength;
-                dataPacket->data = data;
-
-                uint8_t output[256];
-                int len = R2ProtocolEncode(&dataPacket, output, 256);
-
-                if (len >= 0) {
-                    putsUSBUSART(output, len);
-                    CDCTxService();
-                };
+            
+            if (RFID != 0){
+                sprintf(readBuffer,
+                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
+                    7, "DRAWER1", 2, "D1", 10, RFID, 2, "CD");
+                putsUSBUSART(readBuffer);
+                
+//                uint32_t dataLength = 10;
+//                uint8_t data[dataLength] = {RFID};
+//
+//                struct R2ProtocolPacket dataPacket;
+//                dataPacket->source = "DRAWER1";
+//                dataPacket->destination = "PI";
+//                dataPacket->id = "";
+//                dataPacket->data_len = dataLength;
+//                dataPacket->data = data;
+//
+//                uint8_t output[256];
+//                int len = R2ProtocolEncode(&dataPacket, output, 256);
+//
+//                if (len >= 0) {
+//                    putsUSBUSART(output, len);
+//                    CDCTxService();
+//                };
             }
         }
         
