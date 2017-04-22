@@ -199,8 +199,7 @@ static PT_THREAD (protothread1(struct pt *pt))
             case CHECKSUM_CORRECT:
                 //rfid_buffer contains the correct 10 ascii bytes
                 //send rfid_buffer to CS
-                for (i = 0; i < 10; i++)
-                        RFID[i] = 0;
+                
                 state = WAIT_TRANSMIT;
                 break;      
         }  
@@ -305,6 +304,9 @@ static PT_THREAD (protothread2(struct pt *pt))
                     putsUSBUSART(output, len);
                     CDCTxService();
                 };
+                int i = 0;
+                for (i = 0; i < 10; i++)
+                        RFID[i] = 0;
             }
         }
         
@@ -337,7 +339,7 @@ int main(void)
     while(1)
     {
         PT_SCHEDULE(protothread1(&pt1));
-        PT_SCHEDULE(protothread1(&pt2));
+        PT_SCHEDULE(protothread2(&pt2));
     }
 }//end main
 
