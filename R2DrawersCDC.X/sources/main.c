@@ -147,8 +147,9 @@ int main(void)
 		// Application-specific tasks.
 		// Application related code may be added here, or in the ProcessIO() function.
         //int result = ProcessIO(sourceBuffer, payloadBuffer, checksumBuffer, transactionBuffer);
-        struct R2ProtocolPacket commandPacket;
-        char USBOutBuffer[CDC_DATA_OUT_EP_SIZE] = ProcessIO();
+        
+        struct R2ProtocolPacket commandPacket;  //struct to store command received
+        char USBOutBuffer[CDC_DATA_OUT_EP_SIZE] = ProcessIO();  //
         
         int endData = R2ProtocolDecode(USBOutBuffer, CDC_DATA_OUT_EP_SIZE, &commandPacket);
         int result = 1 ? endData > 0 : 0;
