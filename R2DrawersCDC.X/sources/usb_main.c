@@ -122,7 +122,7 @@ char ProcessIO()
     
     if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady()){
         memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
-        
+    }  
 //        enum states {   GET_START_PREFIX, GET_START,
 //                        GET_HEADER, GET_LENGTH, GET_DATA, 
 //                        GET_END_PREFIX, GET_END};

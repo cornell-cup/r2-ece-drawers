@@ -59,10 +59,14 @@
 
 /** I N C L U D E S **********************************************************/
 
+#include "../includes/config.h"
+#include "../includes/global.h"
 #include "GenericTypeDefs.h"
 #include "../includes/Compiler.h"
 #include "../includes/usb/usb_config.h"
 #include "../includes/usb/usb_device.h"
+#include <stdlib.h>
+#include <stdio.h>
 
 #define EnablePullUpB(bits) CNPDBCLR=bits; CNPUBSET=bits;
 #define EnablePullUpA(bits) CNPDACLR=bits; CNPUASET=bits;
@@ -82,11 +86,14 @@
 
 /** V A R I A B L E S ********************************************************/
 char RFID[10] = {0};
+char TOOLSTATUS;
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 static void InitializeSystem(void);
 void initPWM(void);
 void setServoSpeed(int speed);
+void initToolStatus(void);
+uint8_t getToolStatus(void);
 
 /******************************************************************************
  * Function:        void main(void)
@@ -149,7 +156,7 @@ int main(void)
         //int result = ProcessIO(sourceBuffer, payloadBuffer, checksumBuffer, transactionBuffer);
         
         struct R2ProtocolPacket commandPacket;  //struct to store command received
-        char USBOutBuffer[CDC_DATA_OUT_EP_SIZE] = ProcessIO();  //
+        char USBOutBuffer[CDC_DATA_OUT_EP_SIZE] = {ProcessIO()};  
         
         int endData = R2ProtocolDecode(USBOutBuffer, CDC_DATA_OUT_EP_SIZE, &commandPacket);
         int result = 1 ? endData > 0 : 0;
@@ -167,13 +174,15 @@ int main(void)
 //                        payloadBuffer, checksumBuffer);
 //            putsUSBUSART(readBuffer);
  
-            if (strncmp(commandPacket->data, CMD_OPEN, 5)==0){
+            if (strncmp(commandPacket.data, CMD_OPEN, 5)==0){
+                sprintf("%s", "received cmd to open");
                 setServoSpeed(SERVO_OPEN);
             }
-            else if (strncmp(commandPacket->data, CMD_CLOSE, 5)==0){
+            else if (strncmp(commandPacket.data, CMD_CLOSE, 5)==0){
                 setServoSpeed(SERVO_CLOSE);
             }
-            else if (strncmp(commandPacket->data, CMD_TOOLS, 5)==0){
+            else if (strncmp(commandPacket.data, CMD_TOOLS, 5)==0){
+//                sprintf("got command for tools");
 //                sprintf(readBuffer,
 //                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
 //                    7, "DRAWER1", 2, "D1", 1, getToolStatus(), 2, "CD");
@@ -181,49 +190,43 @@ int main(void)
                 
                 //send data using R2Protocol.h
                 uint32_t dataLength = 1;
-                uint8_t data[dataLength] = {getToolStatus()};
+                uint8_t data[1] = {TOOLSTATUS};
 
-                struct R2ProtocolPacket dataPacket;
-                dataPacket->source = "DRAWER1";
-                dataPacket->destination = "PI";
-                dataPacket->id = "";
-                dataPacket->data_len = dataLength;
-                dataPacket->data = data;
+                struct R2ProtocolPacket dataPacket = {
+                    "DRAWER1", "NUC", data, dataLength, "" 
+                };
 
                 uint8_t output[CDC_DATA_OUT_EP_SIZE];
                 int len = R2ProtocolEncode(&dataPacket, output, CDC_DATA_OUT_EP_SIZE);
 
                 if (len >= 0) {
-                    putsUSBUSART(output, len);
+                    putsUSBUSART(output);
                     CDCTxService();
                 }
             }
             
-            if (RFID != 0){
-//                sprintf(readBuffer,
-//                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
-//                    7, "DRAWER1", 2, "D1", 10, RFID, 2, "CD");
-//                putsUSBUSART(readBuffer);
-                
-                //send data using R2Protocol.h
-                uint32_t dataLength = 10;
-                uint8_t data[dataLength] = {RFID};
-
-                struct R2ProtocolPacket dataPacket;
-                dataPacket->source = "DRAWER1";
-                dataPacket->destination = "PI";
-                dataPacket->id = "";
-                dataPacket->data_len = dataLength;
-                dataPacket->data = data;
-
-                uint8_t output[256];
-                int len = R2ProtocolEncode(&dataPacket, output, 256);
-
-                if (len >= 0) {
-                    putsUSBUSART(output, len);
-                    CDCTxService();
-                };
-            }
+//            if (RFID != 0){
+////                sprintf(readBuffer,
+////                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
+////                    7, "DRAWER1", 2, "D1", 10, RFID, 2, "CD");
+////                putsUSBUSART(readBuffer);
+//                
+//                //send data using R2Protocol.h
+//                uint32_t dataLength = 10;
+//                uint8_t data[10] = {RFID};
+//
+//                struct R2ProtocolPacket dataPacket = {
+//                    "DRAWER1", "NUC", data, dataLength, "" 
+//                };
+//
+//                uint8_t output[256];
+//                int len = R2ProtocolEncode(&dataPacket, output, 256);
+//
+//                if (len >= 0) {
+//                    putsUSBUSART(output);
+//                    CDCTxService();
+//                };
+//            }
         }
         
     }//end while
@@ -302,7 +305,6 @@ static void InitializeSystem(void)
 	EnablePullUpA(BIT_4); //back limit switch
 	EnablePullUpB(BIT_0); //front limit switch
     initToolStatus();
-    initRFID();
 	
 }//end InitializeSystem
 
@@ -356,11 +358,6 @@ uint8_t getToolStatus(void) {
     uint8_t end = 1;
 
     uint8_t toolStatus = start + sw1 + sw2 + sw3 + sw4 + sw5 + sw6 + end;
+    TOOLSTATUS = toolStatus;
     return toolStatus;
 }
-
-void initRFID() {
-    
-}
-
-
