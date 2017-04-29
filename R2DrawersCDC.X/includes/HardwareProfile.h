@@ -104,17 +104,29 @@
     #define mLED_4_Toggle()     mLED_4 = !mLED_4;
     
     /** SWITCH *********************************************************/
-    #define mInitSwitch2()      TRISBbits.TRISB8=1;
-    #define mInitSwitch3()      TRISBbits.TRISB9=1;
-    #define mInitAllSwitches()  mInitSwitch2();mInitSwitch3();
-    #define sw2                 PORTBbits.RB8
-    #define sw3                 PORTBbits.RB9    
+//    #define mInitSwitch2()      TRISBbits.TRISB8=1;
+//    #define mInitSwitch3()      TRISBbits.TRISB9=1;
+//    #define mInitAllSwitches()  mInitSwitch2();mInitSwitch3();
+//    #define sw2                 PORTBbits.RB8
+//    #define sw3                 PORTBbits.RB9    
+
+	#define EnablePullUpA(bits) CNPDACLR=bits; CNPUASET=bits;
+	#define EnablePullUpB(bits) CNPDBCLR=bits; CNPUBSET=bits;
 
     /** I/O pin definitions ********************************************/
     #define INPUT_PIN 1
     #define OUTPUT_PIN 0
 
-    #define BAUD_RATE   115200
+    #define BAUD_RATE                   115200
+    #define LENGTH_IN_ASCII
+    #define MAX_LENGTH                  9
+    #define MAXLENGTH_SOURCE            MAX_LENGTH
+    #define MAXLENGTH_DESTINATION       MAX_LENGTH
+    #define MAXLENGTH_TRANSACTION       MAX_LENGTH
+    #define MAXLENGTH_PAYLOAD           MAX_LENGTH
+    #define MAXLENGTH_CHECKSUM          MAX_LENGTH
+
+    #define WHOAMI                      "DRAWER01"
 
 
 
