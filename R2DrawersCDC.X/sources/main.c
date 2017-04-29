@@ -50,7 +50,7 @@
 #include "../includes/usb/usb.h"
 #include "../includes/usb/usb_function_cdc.h"
 #include "../includes/HardwareProfile.h"
-#include "../includes/R2Protocol.h"
+
 
 #pragma config FNOSC = PRIPLL, POSCMOD = HS, FSOSCEN = OFF, OSCIOFNC = OFF
 #pragma config FPLLIDIV = DIV_2, FPLLMUL = MUL_20, FPBDIV = DIV_1, FPLLODIV = DIV_2
@@ -69,6 +69,7 @@
 #include <stdio.h>
 #include "../includes/uart_init.h"
 #include "../includes/uart_init.c"
+#include "../includes/R2Protocol.h"
 
 
 #define EnablePullUpB(bits) CNPDBCLR=bits; CNPUBSET=bits;
@@ -159,42 +160,21 @@ int main(void)
 		// Application related code may be added here, or in the ProcessIO() function.
         //int result = ProcessIO(sourceBuffer, payloadBuffer, checksumBuffer, transactionBuffer);
         
-        printf("Testing\r\n");
+        printf("\r\n");
         struct R2ProtocolPacket commandPacket;  //struct to store command received
-        //continue;
-        commandPacket.data_len = 16;
-        unsigned char tempBuf[16];
-        commandPacket.data = tempBuf;
-                
-        char buffer[64];
+        uint8_t packetData[32] = {0};
+        commandPacket.data_len = 32;
+        commandPacket.data = packetData;
+
+        int result = ProcessIO(&commandPacket); 
         
-        if (USBUSARTIsTxTrfReady())
-        {
-            char transLength = ProcessIO(buffer, sizeof(buffer));
-            if (transLength > 1)
-            {
-                printf("BUFSIZE: %d\r\n", transLength); 
-            }
-        }
-        CDCTxService();
-        
-        
-        int endData = R2ProtocolDecode(buffer, CDC_DATA_OUT_EP_SIZE, &commandPacket);
-        //printf("%s", endData);
-        int result = endData > 0 ? 1 : 0;
         /* the buffers now contain relevant information;
          * they are updated if result == 1; otherwise, it's old info
          */
+        printf("%c", commandPacket.data[0]);
         
         if (result == 1){
-            // new data available
-            
-            //print out data obtained:
-//            sprintf(readBuffer,
-//                "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
-//                    sourceBuffer, transactionBuffer, 
-//                        payloadBuffer, checksumBuffer);
-//            putsUSBUSART(readBuffer);
+           // new data available
  
             if (strncmp(commandPacket.data, CMD_OPEN, 1)==0){
                 //sprintf("%s", "received cmd to open");
@@ -204,35 +184,35 @@ int main(void)
                 //sprintf("%s", "received cmd to close");
                 setServoSpeed(SERVO_MIN);
             }
-            else if (strncmp(commandPacket.data, CMD_TOOLS, 1)==0){
+//            else if (strncmp(commandPacket.data, CMD_TOOLS, 1)==0){
 //                sprintf("got command for tools");
 //                sprintf(readBuffer,
 //                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
 //                    7, "DRAWER1", 2, "D1", 1, getToolStatus(), 2, "CD");
 //                putsUSBUSART(readBuffer);
-                //sprintf("%s", "received request for tools");
-                //send data using R2Protocol.h
-                uint32_t dataLength = 1;
-                uint8_t data[1] = {TOOLSTATUS};
-
-                struct R2ProtocolPacket dataPacket = {
-                    "DRAWER1", "NUC", data, dataLength, "" 
-                };
-
-                uint8_t output[CDC_DATA_OUT_EP_SIZE];
-                int len = R2ProtocolEncode(&dataPacket, output, CDC_DATA_OUT_EP_SIZE);
-
-                if (len >= 0) {
-                    putsUSBUSART(output);
-                    CDCTxService();
-                }
-            }
-            
+//                //sprintf("%s", "received request for tools");
+//                //send data using R2Protocol.h
+//                uint32_t dataLength = 1;
+//                uint8_t data[1] = {TOOLSTATUS};
+//
+//                struct R2ProtocolPacket dataPacket = {
+//                    "DRAWER1", "NUC", data, dataLength, "" 
+//                };
+//
+//                uint8_t output[CDC_DATA_OUT_EP_SIZE];
+//                int len = R2ProtocolEncode(&dataPacket, output, CDC_DATA_OUT_EP_SIZE);
+//
+//                if (len >= 0) {
+//                    putsUSBUSART(output);
+//                    CDCTxService();
+//                }
+//            }
+//            
 //            if (RFID != 0){
-////                sprintf(readBuffer,
-////                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
-////                    7, "DRAWER1", 2, "D1", 10, RFID, 2, "CD");
-////                putsUSBUSART(readBuffer);
+//                sprintf(readBuffer,
+//                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
+//                    7, "DRAWER1", 2, "D1", 10, RFID, 2, "CD");
+//                putsUSBUSART(readBuffer);
 //                
 //                //send data using R2Protocol.h
 //                uint32_t dataLength = 10;

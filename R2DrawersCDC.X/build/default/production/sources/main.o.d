@@ -11,6 +11,13 @@ sources/../includes/usb/usb_hal.h  \
  sources/../includes/usb/usb_function_cdc.h  \
 sources/../includes/usb/usb.h  \
  sources/../includes/HardwareProfile.h  \
+sources/../includes/config.h  \
+ sources/../includes/global.h  \
 sources/../includes/Compiler.h  \
  sources/../includes/usb/usb_config.h  \
- sources/../includes/usb/usb_device.h 
+ sources/../includes/usb/usb_device.h  \
+sources/../includes/uart_init.h  \
+ sources/../includes/uart_init.c  \
+sources/../includes/uart_init.h  \
+ sources/../includes/global.h  \
+sources/../includes/R2Protocol.h 
