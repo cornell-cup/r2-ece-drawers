@@ -51,23 +51,54 @@
 #include "../includes/usb/usb_function_cdc.h"
 #include "../includes/HardwareProfile.h"
 
+
 #pragma config FNOSC = PRIPLL, POSCMOD = HS, FSOSCEN = OFF, OSCIOFNC = OFF
 #pragma config FPLLIDIV = DIV_2, FPLLMUL = MUL_20, FPBDIV = DIV_1, FPLLODIV = DIV_2
-#pragma config FWDTEN = OFF, JTAGEN = OFF
+#pragma config FWDTEN = OFF, JTAGEN = OFF, ICESEL = ICS_PGx3
 #pragma config UPLLIDIV = DIV_2, UPLLEN = ON
 
 /** I N C L U D E S **********************************************************/
 
+#include "../includes/config.h"
+#include "../includes/global.h"
 #include "GenericTypeDefs.h"
 #include "../includes/Compiler.h"
 #include "../includes/usb/usb_config.h"
 #include "../includes/usb/usb_device.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include "../includes/uart_init.h"
+#include "../includes/uart_init.c"
+#include "../includes/R2Protocol.h"
+
+
+#define EnablePullUpB(bits) CNPDBCLR=bits; CNPUBSET=bits;
+#define EnablePullUpA(bits) CNPDACLR=bits; CNPUASET=bits;
+
+/** C O M M A N D S ********************************************************/
+#define CMD_OPEN    "O"
+#define CMD_CLOSE   "C"
+#define CMD_TOOLS   "T"
+
+#define PERIOD      50000   // 20 ms
+#define SERVO_MIN   2000    // 1000 us
+#define SERVO_REST  3750    // 1500 us
+#define SERVO_MAX   5000    // 2000 us
+#define SERVO_RUN_SPEED     100     //400 us
+#define SERVO_OPEN  (SERVO_REST + SERVO_RUN_SPEED)
+#define SERVO_CLOSE (SERVO_REST - SERVO_RUN_SPEED)
 
 /** V A R I A B L E S ********************************************************/
+char RFID[10] = {0};
+char TOOLSTATUS;
+extern char USB_Out_Buffer[CDC_DATA_OUT_EP_SIZE];
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 static void InitializeSystem(void);
-
+void initPWM(void);
+void setServoSpeed(int speed);
+void initToolStatus(void);
+uint8_t getToolStatus(void);
 
 /******************************************************************************
  * Function:        void main(void)
@@ -87,6 +118,13 @@ static void InitializeSystem(void);
 
 int main(void)
 {   
+	PPSInput(4, INT1, RPB0);
+	PPSInput(3, INT2, RPA4);
+		
+	ConfigINT1(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+	ConfigINT2(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+	
+    //initialize PWM and Limit Switches, Tool Switches, and RFID
     InitializeSystem();
 
     #if defined(USB_INTERRUPT)
@@ -94,7 +132,7 @@ int main(void)
     #endif
 
     while(1)
-    {
+    {	
         #if defined(USB_POLLING)
 		// Check bus status and service USB interrupts.
         USBDeviceTasks(); // Interrupt or polling method.  If using polling, must call
@@ -110,13 +148,90 @@ int main(void)
         				  // function does not take very long to execute (ex: <100 
         				  // instruction cycles) before it returns.
         #endif
-    				  
 
         OpenTimer1(T1_ON | T1_PS_1_256, 0xFFFF);
-        
+        init_uart();
+//        char sourceBuffer[2] = {0};
+//        char transactionBuffer[2] = {0};
+//        char payloadBuffer[1] = {0};
+//        char checksumBuffer[2] = {0};
+//            
 		// Application-specific tasks.
 		// Application related code may be added here, or in the ProcessIO() function.
-        ProcessIO();        
+        //int result = ProcessIO(sourceBuffer, payloadBuffer, checksumBuffer, transactionBuffer);
+        
+        printf("\r\n");
+        struct R2ProtocolPacket commandPacket;  //struct to store command received
+        uint8_t packetData[32] = {0};
+        commandPacket.data_len = 32;
+        commandPacket.data = packetData;
+
+        int result = ProcessIO(&commandPacket); 
+        
+        /* the buffers now contain relevant information;
+         * they are updated if result == 1; otherwise, it's old info
+         */
+        printf("%c", commandPacket.data[0]);
+        
+        if (result == 1){
+           // new data available
+ 
+            if (strncmp(commandPacket.data, CMD_OPEN, 1)==0){
+                //sprintf("%s", "received cmd to open");
+                setServoSpeed(SERVO_OPEN);
+            }
+            else if (strncmp(commandPacket.data, CMD_CLOSE, 1)==0){
+                //sprintf("%s", "received cmd to close");
+                setServoSpeed(SERVO_MIN);
+            }
+//            else if (strncmp(commandPacket.data, CMD_TOOLS, 1)==0){
+//                sprintf("got command for tools");
+//                sprintf(readBuffer,
+//                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
+//                    7, "DRAWER1", 2, "D1", 1, getToolStatus(), 2, "CD");
+//                putsUSBUSART(readBuffer);
+//                //sprintf("%s", "received request for tools");
+//                //send data using R2Protocol.h
+//                uint32_t dataLength = 1;
+//                uint8_t data[1] = {TOOLSTATUS};
+//
+//                struct R2ProtocolPacket dataPacket = {
+//                    "DRAWER1", "NUC", data, dataLength, "" 
+//                };
+//
+//                uint8_t output[CDC_DATA_OUT_EP_SIZE];
+//                int len = R2ProtocolEncode(&dataPacket, output, CDC_DATA_OUT_EP_SIZE);
+//
+//                if (len >= 0) {
+//                    putsUSBUSART(output);
+//                    CDCTxService();
+//                }
+//            }
+//            
+//            if (RFID != 0){
+//                sprintf(readBuffer,
+//                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
+//                    7, "DRAWER1", 2, "D1", 10, RFID, 2, "CD");
+//                putsUSBUSART(readBuffer);
+//                
+//                //send data using R2Protocol.h
+//                uint32_t dataLength = 10;
+//                uint8_t data[10] = {RFID};
+//
+//                struct R2ProtocolPacket dataPacket = {
+//                    "DRAWER1", "NUC", data, dataLength, "" 
+//                };
+//
+//                uint8_t output[256];
+//                int len = R2ProtocolEncode(&dataPacket, output, 256);
+//
+//                if (len >= 0) {
+//                    putsUSBUSART(output);
+//                    CDCTxService();
+//                };
+//            }
+        }
+        
     }//end while
 }//end main
 
@@ -188,7 +303,64 @@ static void InitializeSystem(void)
 
     USBDeviceInit();	//usb_device.c.  Initializes USB module SFRs and firmware
     					//variables to known states.
+	
+	initPWM();
+	EnablePullUpA(BIT_4); //back limit switch
+	EnablePullUpB(BIT_0); //front limit switch
+    initToolStatus();
+	
 }//end InitializeSystem
 
 
 /** EOF main.c *************************************************/
+
+void initPWM(void){
+    PPSOutput(1, RPB4, OC1);        // pin 11
+    
+    mPORTBSetPinsDigitalOut(BIT_4);
+    
+    // pwm mode, fault pin disabled, timer 2 time base
+    OC1CON = OCCON_ON | OCCON_OCM1 | OCCON_OCM2;
+    
+    // 16-bit timer 2, no interrupt, 1:16 prescale, PR2=50000 -> period = 20ms
+    OpenTimer2(T2_32BIT_MODE_OFF | T2_INT_OFF | T2_PS_1_16 | T2_ON, PERIOD-1);
+	
+	setServoSpeed(SERVO_REST);
+}
+
+void setServoSpeed(int speed){
+    if (speed < SERVO_MIN) speed = SERVO_MIN;
+    if (speed > SERVO_MAX) speed = SERVO_MAX;
+    SetDCOC1PWM(speed);		//RPB4, OC1
+}
+
+void __ISR(_EXTERNAL_1_VECTOR, ipl1) StopOpen(void) { //INT1, RPB0, Front Switch (FR_SW)
+	mINT1ClearIntFlag();
+	setServoSpeed(SERVO_REST);
+}
+
+void __ISR(_EXTERNAL_2_VECTOR, ipl2) StopClose(void) { //INT2, RPA4, Back Switch (BK_SW)
+	mINT2ClearIntFlag();
+	setServoSpeed(SERVO_REST);
+}
+
+void initToolStatus(void) {
+    //Initialize tool switches as digital inputs
+    //SW1 = RB1, SW2 = RB2, SW3 = RB3, SW4 = RB7, SW5 = RB14, SW6 = RB15
+    mPORTBSetPinsDigitalIn(BIT_1 | BIT_2 | BIT_3 | BIT_7 | BIT_14 | BIT_15);
+}
+
+uint8_t getToolStatus(void) {
+    uint8_t start = 0;
+    uint8_t sw1 =  (mPORTBReadBits(BIT_1)>0)*64;
+    uint8_t sw2 =  (mPORTBReadBits(BIT_2)>0)*32;
+    uint8_t sw3 =  (mPORTBReadBits(BIT_3)>0)*16;
+    uint8_t sw4 =  (mPORTBReadBits(BIT_7)>0)*8;
+    uint8_t sw5 =  (mPORTBReadBits(BIT_14)>0)*4;
+    uint8_t sw6 =  (mPORTBReadBits(BIT_15)>0)*2;
+    uint8_t end = 1;
+
+    uint8_t toolStatus = start + sw1 + sw2 + sw3 + sw4 + sw5 + sw6 + end;
+    TOOLSTATUS = toolStatus;
+    return toolStatus;
+}

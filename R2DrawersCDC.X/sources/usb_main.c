@@ -68,16 +68,13 @@ unsigned char RS232_Out_Data_Rdy = 0;
 USB_HANDLE  lastTransmission;
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
-void ProcessIO(void);
+//void ProcessIO(char* sourceBuffer, char* payloadBuffer, char* checksumBuffer, char* transactionBuffer);
 void USBDeviceTasks(void);
 void USBCBSendResume(void);
 void BlinkUSBStatus(void);
 void UserInit(void);
 
 void loadBuffer(uint8_t* copyBuffer, uint16_t copyLength);
-
-volatile int arrayIndex = 0;
-volatile int dataLength = 0;
         
         
 /********************************************************************
@@ -85,9 +82,12 @@ volatile int dataLength = 0;
  *
  * PreCondition:    None
  *
- * Input:           None
+ * Input:           sourceBuffer 
+ *                  payloadBuffer
+ *                  checksumBuffer
+ *                  transactionBuffer
  *
- * Output:          None
+ * Output:          Returns 1 if new packet. 0 otherwise.
  *
  * Side Effects:    None
  *
@@ -97,8 +97,9 @@ volatile int dataLength = 0;
  *
  * Note:            None
  *******************************************************************/
-void ProcessIO(void)
-{   
+int ProcessIO(struct R2ProtocolPacket *packet)
+{
+    int result = 0;
     //Blink the LEDs according to the USB device status
     BlinkUSBStatus();
     // User Application USB tasks
@@ -121,142 +122,16 @@ void ProcessIO(void)
     
     if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady()){
         memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
-        
-        enum states { SE_HEADER, GET_START, SOURCE_LENGTH, SOURCE_DATA,
-                        DEST_LENGTH, DEST_DATA, 
-                        GET_HEADER, GET_LENGTH, GET_DATA, 
-                        SE_FOOTER, GET_END};
-        enum dataTypes { START='b', SOURCE='s', DESTINATION='d', PAYLOAD='p', CHECKSUM='k' };
-        
-        static uint8_t STATE = SE_HEADER;
-        static uint8_t dataType = START;
-        
-        char START_TEXT[] = "00";
-        char SELF[] = "DRWR01";
-        char dataSource[30];
-        char payloadBuffer[30];
-        char checksumBuffer[30];
-        
-        int i;
-        
-        for (i=0; i<LastRS232Out; i++){
-            uint8_t c = USB_Out_Buffer[i];
-            uint8_t requiredType;
-            
-            switch (STATE){
-                case SE_HEADER:
-                    dataType = START;
-                    if (c == 'G'){
-                        arrayIndex = 0;
-                        dataLength = 2;
-                        STATE = GET_START;
-                        putsUSBUSART("START\n\r");
-                    }
-                    break;
-                case GET_START:
-                    if (c != START_TEXT[arrayIndex++]){
-                        // Wrong data... Retry from beginning.
-                        STATE = SE_HEADER;
-                        putsUSBUSART("WRONG\n\r");
-                    }
-                    else{
-                        // Right data. Check if correct number received.
-                        if (arrayIndex == dataLength){
-                            STATE = GET_HEADER;
-                            putsUSBUSART("GET HEADER\n\r");
-                        }
-                    }
-                    break;
-                case GET_HEADER:
-                    if (dataType == START) requiredType = SOURCE;
-                    else if (dataType == SOURCE) requiredType = DESTINATION;
-                    else if (dataType == DESTINATION) requiredType = PAYLOAD;
-                    else if (dataType == PAYLOAD) requiredType = CHECKSUM;
-                    
-                    if (c == 'S') c = SOURCE;
-                    else if (c == 'D') c = DESTINATION;
-                    else if (c == 'P') c = PAYLOAD;
-                    else if (c == 'K') c = CHECKSUM;
-                    
-                    if (requiredType == c){
-                        dataType = requiredType;
-                    }
-                    else {
-                        STATE = SE_HEADER;
-                        break;
-                    }
-                    putsUSBUSART("GET LENGTH\n\r");
-                    STATE = GET_LENGTH;
-                    break;
-                case GET_LENGTH:
-                    dataLength = c - '0';
-                    if (dataLength < 0) dataLength = 0;
-                    if (dataLength > 9) dataLength = 9;
-                    sprintf(readBuffer, "GET DATA: %d [%c]\n\r", dataLength, dataType);
-                    putsUSBUSART(readBuffer);
-                    arrayIndex = 0;
-                    STATE = GET_DATA;
-                    break;
-                case GET_DATA:
-                    readBuffer[arrayIndex++] = c;
-                    if (arrayIndex == dataLength){
-                        if (dataType == SOURCE){
-                            strncpy(dataSource, readBuffer, dataLength);
-                            dataSource[dataLength] = '\0';
-                            STATE = GET_HEADER;
-                            sprintf(readBuffer, "DATA: %s\n\r", dataSource);
-                            putsUSBUSART(readBuffer);
-                        }
-                        else if (dataType == DESTINATION){
-                            readBuffer[dataLength] = '\0';
-                            if (strcmp(readBuffer, SELF)){
-                                // not aimed at self
-                                STATE = SE_HEADER;
-                                putsUSBUSART("NOT SELF\r\n");
-                            }
-                            else{
-                                STATE = GET_HEADER;
-                                putsUSBUSART("GET PAYLOAD\r\n");
-                            }
-                        }
-                        else if (dataType == PAYLOAD){
-                            strncpy(payloadBuffer, readBuffer, dataLength);
-                            payloadBuffer[dataLength] = '\0';
-                            STATE = GET_HEADER;
-                            sprintf(readBuffer, "PAYLOAD: %s\n\rGET CHECKSUM\n\r", payloadBuffer);
-                            putsUSBUSART(readBuffer);
-                        }
-                        else if (dataType == CHECKSUM){
-                            strncpy(checksumBuffer, readBuffer, dataLength);
-                            checksumBuffer[dataLength] = '\0';
-                            sprintf(readBuffer, "CHECKSUM: %s\n\rDONE\n\r", checksumBuffer);
-                            putsUSBUSART(readBuffer);
-                            STATE = SE_HEADER;
-                        }
-                    }
-                    break;
-                    
-            }
+        if(R2ProtocolDecode(USB_Out_Buffer ,LastRS232Out, packet) != -1) {
+            result = 1;
         }
-        
-        
-        RS232_Out_Data_Rdy = 0;
     }
 
     CDCTxService();
+    
+    return result;
 
 }//end ProcessIO
-
-void loadBuffer(uint8_t* copyBuffer, uint16_t copyLength){
-    int i;
-    for (i=0; i<copyLength; i++){
-        readBuffer[writeIndex] = copyBuffer[i];
-        writeIndex++;
-        if (writeIndex >= BUFFER_LENGTH){
-            writeIndex = 0;
-        }
-    }
-}
 
 /******************************************************************************
  * Function:        void mySetLineCodingHandler(void)
