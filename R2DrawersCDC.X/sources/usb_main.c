@@ -97,11 +97,11 @@ void loadBuffer(uint8_t* copyBuffer, uint16_t copyLength);
  *
  * Note:            None
  *******************************************************************/
-char ProcessIO()
+char ProcessIO(char * buffer)
 {
 //    int result = 0;
     //Blink the LEDs according to the USB device status
-    BlinkUSBStatus();
+//    BlinkUSBStatus();
     // User Application USB tasks
     if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1)) return;
 
@@ -121,7 +121,7 @@ char ProcessIO()
     //send the USB packet to the host.
     
     if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady()){
-        memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
+        memcpy(buffer, RS232_Out_Data, LastRS232Out);
     }  
 //        enum states {   GET_START_PREFIX, GET_START,
 //                        GET_HEADER, GET_LENGTH, GET_DATA, 
@@ -289,7 +289,7 @@ char ProcessIO()
 //        RS232_Out_Data_Rdy = 0;
 //    }
     CDCTxService();
-    return USB_Out_Buffer;
+    return LastRS232Out;
 }//end ProcessIO
 
 /******************************************************************************
