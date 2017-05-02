@@ -55,6 +55,8 @@
 #include "../includes/Compiler.h"
 #include "../includes/usb/usb_config.h"
 #include "../includes/usb/usb_device.h"
+#include <stdio.h>
+#include <string.h>
 
 /** V A R I A B L E S ********************************************************/
 char USB_Out_Buffer[CDC_DATA_OUT_EP_SIZE];
@@ -64,7 +66,7 @@ unsigned char  NextUSBOut;
 //char RS232_In_Data;
 unsigned char    LastRS232Out;  // Number of characters in the buffer
 unsigned char    RS232cp;       // current position within the buffer
-unsigned char RS232_Out_Data_Rdy = 0;
+volatile unsigned char RS232_Out_Data_Rdy = 0;
 USB_HANDLE  lastTransmission;
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
@@ -101,7 +103,7 @@ int ProcessIO(struct R2ProtocolPacket *packet)
 {
     int result = 0;
     //Blink the LEDs according to the USB device status
-    BlinkUSBStatus();
+//    BlinkUSBStatus();
     // User Application USB tasks
     if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1)) return;
 
@@ -119,13 +121,38 @@ int ProcessIO(struct R2ProtocolPacket *packet)
     //Check if any bytes are waiting in the queue to send to the USB host.
     //If any bytes are waiting, and the endpoint is available, prepare to
     //send the USB packet to the host.
+//    int i = LastRS232Out - 3;
+//    int arrayIndex = 0;
+//    int dataLength = 2;
+//    if (RS232_Out_Data[i] == 'G')
+//    {
+//        if (RS232_Out_Data[i+1] == '0')
+//        {
+//            if (RS232_Out_Data[i+2] == '1')
+//            {
+//                if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady())
+//                {
+//                   memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
+//                   if(R2ProtocolDecode(USB_Out_Buffer ,LastRS232Out, packet) != -1) 
+//                   {
+//                        result = 1;
+//                        RS232_Out_Data_Rdy = 0;
+//                   } 
+//                }
+//            }
+//        }
+//    }
     
-    if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady()){
-        memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
-        if(R2ProtocolDecode(USB_Out_Buffer ,LastRS232Out, packet) != -1) {
+    if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady())
+    {
+       memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
+       if(R2ProtocolDecode(USB_Out_Buffer ,LastRS232Out, packet) != -1) 
+       {
             result = 1;
-        }
+            RS232_Out_Data_Rdy = 0;
+       } 
     }
+    
 
     CDCTxService();
     
@@ -229,73 +256,73 @@ void mySetLineCodingHandler(void)
  *******************************************************************/
 void BlinkUSBStatus(void)
 {
-    static WORD led_count=0;
-    
-    if(led_count == 0)led_count = 10000U;
-    led_count--;
-
-    #define mLED_Both_Off()         {mLED_1_Off();mLED_2_Off();}
-    #define mLED_Both_On()          {mLED_1_On();mLED_2_On();}
-    #define mLED_Only_1_On()        {mLED_1_On();mLED_2_Off();}
-    #define mLED_Only_2_On()        {mLED_1_Off();mLED_2_On();}
-
-    if(USBSuspendControl == 1)
-    {
-        if(led_count==0)
-        {
-            mLED_1_Toggle();
-            if(mGetLED_1())
-            {
-                mLED_2_On();
-            }
-            else
-            {
-                mLED_2_Off();
-            }
-        }//end if
-    }
-    else
-    {
-        if(USBDeviceState == DETACHED_STATE)
-        {
-            mLED_Both_Off();
-        }
-        else if(USBDeviceState == ATTACHED_STATE)
-        {
-            mLED_Both_On();
-        }
-        else if(USBDeviceState == POWERED_STATE)
-        {
-            mLED_Only_1_On();
-        }
-        else if(USBDeviceState == DEFAULT_STATE)
-        {
-            mLED_Only_2_On();
-        }
-        else if(USBDeviceState == ADDRESS_STATE)
-        {
-            if(led_count == 0)
-            {
-                mLED_1_Toggle();
-                mLED_2_Off();
-            }//end if
-        }
-        else if(USBDeviceState == CONFIGURED_STATE)
-        {
-            if(led_count==0)
-            {
-                mLED_1_Toggle();
-                if(mGetLED_1())
-                {
-                    mLED_2_Off();
-                }
-                else
-                {
-                    mLED_2_On();
-                }
-            }//end if
-        }//end if(...)
-    }//end if(UCONbits.SUSPND...)
+//    static WORD led_count=0;
+//    
+//    if(led_count == 0)led_count = 10000U;
+//    led_count--;
+//
+//    #define mLED_Both_Off()         {mLED_1_Off();mLED_2_Off();}
+//    #define mLED_Both_On()          {mLED_1_On();mLED_2_On();}
+//    #define mLED_Only_1_On()        {mLED_1_On();mLED_2_Off();}
+//    #define mLED_Only_2_On()        {mLED_1_Off();mLED_2_On();}
+//
+//    if(USBSuspendControl == 1)
+//    {
+//        if(led_count==0)
+//        {
+//            mLED_1_Toggle();
+//            if(mGetLED_1())
+//            {
+//                mLED_2_On();
+//            }
+//            else
+//            {
+//                mLED_2_Off();
+//            }
+//        }//end if
+//    }
+//    else
+//    {
+//        if(USBDeviceState == DETACHED_STATE)
+//        {
+//            mLED_Both_Off();
+//        }
+//        else if(USBDeviceState == ATTACHED_STATE)
+//        {
+//            mLED_Both_On();
+//        }
+//        else if(USBDeviceState == POWERED_STATE)
+//        {
+//            mLED_Only_1_On();
+//        }
+//        else if(USBDeviceState == DEFAULT_STATE)
+//        {
+//            mLED_Only_2_On();
+//        }
+//        else if(USBDeviceState == ADDRESS_STATE)
+//        {
+//            if(led_count == 0)
+//            {
+//                mLED_1_Toggle();
+//                mLED_2_Off();
+//            }//end if
+//        }
+//        else if(USBDeviceState == CONFIGURED_STATE)
+//        {
+//            if(led_count==0)
+//            {
+//                mLED_1_Toggle();
+//                if(mGetLED_1())
+//                {
+//                    mLED_2_Off();
+//                }
+//                else
+//                {
+//                    mLED_2_On();
+//                }
+//            }//end if
+//        }//end if(...)
+//    }//end if(UCONbits.SUSPND...)
 
 }//end BlinkUSBStatus
 
