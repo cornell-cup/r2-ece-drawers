@@ -50,11 +50,7 @@
 #include "../includes/usb/usb.h"
 #include "../includes/usb/usb_function_cdc.h"
 #include "../includes/HardwareProfile.h"
-#include "../includes/R2Protocol.h"
-#include "config.h"
-#include "global.h"
-#include "uart_init.h"
-#include "protothreads.h"
+
 
 #pragma config FNOSC = PRIPLL, POSCMOD = HS, FSOSCEN = OFF, OSCIOFNC = OFF
 #pragma config FPLLIDIV = DIV_2, FPLLMUL = MUL_20, FPBDIV = DIV_1, FPLLODIV = DIV_2
@@ -63,10 +59,18 @@
 
 /** I N C L U D E S **********************************************************/
 
+#include "../includes/config.h"
+#include "../includes/global.h"
 #include "GenericTypeDefs.h"
 #include "../includes/Compiler.h"
 #include "../includes/usb/usb_config.h"
 #include "../includes/usb/usb_device.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include "../includes/uart_init.h"
+#include "../includes/uart_init.c"
+#include "../includes/R2Protocol.h"
+
 
 #define EnablePullUpB(bits) CNPDBCLR=bits; CNPUBSET=bits;
 #define EnablePullUpA(bits) CNPDACLR=bits; CNPUASET=bits;
@@ -78,29 +82,24 @@
 
 #define PERIOD      50000   // 20 ms
 #define SERVO_MIN   2000    // 1000 us
-#define SERVO_REST  3750    // 1500 us
+#define SERVO_REST  3705    // 1500 us
 #define SERVO_MAX   5000    // 2000 us
-#define SERVO_RUN_SPEED     100
+#define SERVO_RUN_SPEED     25     //400 us
 #define SERVO_OPEN  (SERVO_REST + SERVO_RUN_SPEED)
 #define SERVO_CLOSE (SERVO_REST - SERVO_RUN_SPEED)
 
 /** V A R I A B L E S ********************************************************/
-unsigned char rxchar = '0'; //receives a byte
-unsigned char RFID[10] = {0};
-
-enum states {
-    WAIT_TRANSMIT, //wait for STX byte to be sent from RFID module
-    STX_RECEIVED,  //get 10 data bytes, CR+LF, ETX byte. 
-    ETX_RECEIVED,  //check if checksum is correct
-    CHECKSUM_CORRECT //print 10 data bytes + checksum
-};
-
-enum states state = WAIT_TRANSMIT;
+char RFID[10] = {0};
+char TOOLSTATUS;
+extern char USB_Out_Buffer[CDC_DATA_OUT_EP_SIZE];
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 static void InitializeSystem(void);
 void initPWM(void);
 void setServoSpeed(int speed);
+void initToolStatus(void);
+void delay_ms(unsigned long i);
+uint8_t getToolStatus(void);
 
 /******************************************************************************
  * Function:        void main(void)
@@ -117,101 +116,38 @@ void setServoSpeed(int speed);
  *
  * Note:            None
  *****************************************************************************/
-static PT_THREAD (protothread1(struct pt *pt))
-{
-    unsigned char checkSum[10] = {0}; //stores converted ASCII to hex from rfid_buffer
-    unsigned char actualCS1 = '0';
-    unsigned char actualCS2 = '0';
-    PT_BEGIN(pt);
-    
-    int i = 0; 
-    while(1)
-    {
-        switch(state)
-        {
-            case WAIT_TRANSMIT:
-                
-                while(!UARTReceivedDataIsAvailable(UART1)){}; //await transmission
-                rxchar = UARTGetDataByte(UART1);
-                if (rxchar == 2)
-                    state = STX_RECEIVED;
-                break;
-            case STX_RECEIVED:
-                for (i = 0; i < 10; i++) //get next 10 data bytes
-                {
-                   while(!UARTReceivedDataIsAvailable(UART1)){};
-                   RFID[i] = UARTGetDataByte(UART1); 
-                }
-                while(!UARTReceivedDataIsAvailable(UART1)){};
-                actualCS1 = UARTGetDataByte(UART1); //receive first checksum byte
-                while(!UARTReceivedDataIsAvailable(UART1)){};
-                actualCS2 = UARTGetDataByte(UART1);//receive second checksum byte
-            
-                for (i = 0; i < 2; i++) //receives CR + LF
-                {
-                   while(!UARTReceivedDataIsAvailable(UART1)){};
-                   UARTGetDataByte(UART1);
-                }
-                while(!UARTReceivedDataIsAvailable(UART1)){};
-                rxchar = UARTGetDataByte(UART1); //receives ETX character, stores in rxchar              
-                if (rxchar == 3)
-                    state = ETX_RECEIVED;
-                else
-                {
-                    state = WAIT_TRANSMIT;
-                    for (i = 0; i < 10; i++)
-                        RFID[i] = 0;
-                }
-                break;
-            case ETX_RECEIVED:
-                for (i = 0; i < 10; i++) //converts ascii from rfid_buffer to hex into checkSum
-                {
-                    char x = RFID[i];
-                    if (x < 58 && x > 47)
-                        x = x - 48;
-                    else 
-                        x = x - 55;
-                    checkSum[i] = x;
-                }
-                char CS1 = checkSum[0] ^ checkSum[2] ^ 
-                checkSum[4] ^ checkSum[6] ^ checkSum[8]; //calculates 1st checksum byte
-                char CS2 = checkSum[1] ^ checkSum[3] ^ 
-                checkSum[5] ^ checkSum[7] ^ checkSum[9];//calculates 2nd checksum byte
-           
-                if (CS1 < 10)
-                    CS1 = CS1 + 48;
-                else 
-                    CS1 = CS1 + 55;
-                if (CS2 < 10)
-                    CS2 = CS2 + 48;
-                else 
-                    CS2 = CS2 + 55;
-                
-                if ((CS1 == actualCS1) && (CS2 == actualCS2)) //if checksum is correct and ETX received
-                    state = CHECKSUM_CORRECT;
-                else
-                {
-                    state = WAIT_TRANSMIT;
-                    for (i = 0; i < 10; i++)
-                        RFID[i] = 0;
-                }
-                break;
-            case CHECKSUM_CORRECT:
-                //rfid_buffer contains the correct 10 ascii bytes
-                //send rfid_buffer to CS
-                
-                state = WAIT_TRANSMIT;
-                break;      
-        }  
-    }//end while
-    PT_END(pt);
-}
 
-static PT_THREAD (protothread2(struct pt *pt))
-{
-    PT_BEGIN(pt);
+int main(void)
+{   
+    mPORTASetPinsDigitalOut(BIT_0);
+    int i;
+    for (i = 0; i < 12; i++)
+    {
+        mPORTAToggleBits(BIT_0);
+        delay_ms(250);
+    }
+    for (i = 0; i < 12; i++)
+    {
+        mPORTAToggleBits(BIT_0);
+        delay_ms(100);
+    }
+    mPORTAClearBits(BIT_0);
+	PPSInput(4, INT1, RPB0);
+	PPSInput(3, INT2, RPA4);
+	init_uart();
+	ConfigINT1(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+	ConfigINT2(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+	
+    //initialize PWM and Limit Switches, Tool Switches, and RFID
+    InitializeSystem();
+
+    #if defined(USB_INTERRUPT)
+        USBDeviceAttach();
+    #endif
+
     while(1)
     {	
+        continue;
         #if defined(USB_POLLING)
 		// Check bus status and service USB interrupts.
         USBDeviceTasks(); // Interrupt or polling method.  If using polling, must call
@@ -230,117 +166,101 @@ static PT_THREAD (protothread2(struct pt *pt))
 
         OpenTimer1(T1_ON | T1_PS_1_256, 0xFFFF);
         
-        char sourceBuffer[2] = {0};
-        char transactionBuffer[2] = {0};
-        char payloadBuffer[1] = {0};
-        char checksumBuffer[2] = {0};
-            
+//        char sourceBuffer[2] = {0};
+//        char transactionBuffer[2] = {0};
+//        char payloadBuffer[1] = {0};
+//        char checksumBuffer[2] = {0};
+//            
 		// Application-specific tasks.
 		// Application related code may be added here, or in the ProcessIO() function.
-        int result = ProcessIO(sourceBuffer, payloadBuffer, checksumBuffer, transactionBuffer);
-        /* the buffers now contain relevant information;
-         * they are updated if result == 1; otherwise, it's old info
-         */
+        //int result = ProcessIO(sourceBuffer, payloadBuffer, checksumBuffer, transactionBuffer);
         
-        if (result){
-            // new data available
-            
-            //print out data obtained:
-//            sprintf(readBuffer,
-//                "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
-//                    sourceBuffer, transactionBuffer, 
-//                        payloadBuffer, checksumBuffer);
-//            putsUSBUSART(readBuffer);
+        printf("");
+        struct R2ProtocolPacket commandPacket;  //struct to store command received
+        uint8_t packetData[32] = {0};
+        commandPacket.data_len = 32;
+        commandPacket.data = packetData;
+
+        int result = ProcessIO(&commandPacket); 
+        
+        printf("Result: %d\n:", result);
+        
+        
  
-            if (strncmp(payloadBuffer, CMD_OPEN, 5)==0){
-                setServoSpeed(SERVO_OPEN);
-            }
-            else if (strncmp(payloadBuffer, CMD_CLOSE, 5)==0){
-                setServoSpeed(SERVO_CLOSE);
-            }
-            else if (strncmp(payloadBuffer, CMD_TOOLS, 5)==0){
-                uint32_t dataLength = 1;
-                uint8_t data[dataLength] = {getToolStatus()};
-                
-//                sprintf(readBuffer,
-//                "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
-//                    "DRAWER1", "",  getToolStatus(), "");
-//                putsUSBUSART(readBuffer);
-
-                struct R2ProtocolPacket dataPacket;
-                dataPacket->source = "DRAWER1";
-                dataPacket->destination = "PI";
-                dataPacket->id = "";
-                dataPacket->data_len = dataLength;
-                dataPacket->data = data;
-
-                uint8_t output[256];
-                int len = R2ProtocolEncode(&dataPacket, output, 256);
-
-                if (len >= 0) {
-                    putsUSBUSART(output, len);
-                    CDCTxService();
+        int chk = 0;
+        if (result == 1){
+           // new data available
+            //setServoSpeed(4000);
+            if (commandPacket.data[0] == 'C'){
+                if (chk % 10 == 0)
+                {
+                //sprintf("%s", "received cmd to open");
+                    printf("Servo Close\n");
+                    setServoSpeed(SERVO_CLOSE);
+                    
+                    chk++;
                 }
             }
-            else if (RFID != 0){
-//                sprintf(readBuffer,
-//                "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
-//                    "DRAWER1", "", RFID, "");
-//                putsUSBUSART(readBuffer);
-                uint32_t dataLength = 10;
-                uint8_t data[dataLength] = {RFID};
-
-                struct R2ProtocolPacket dataPacket;
-                dataPacket->source = "DRAWER1";
-                dataPacket->destination = "PI";
-                dataPacket->id = "";
-                dataPacket->data_len = dataLength;
-                dataPacket->data = data;
-
-                uint8_t output[256];
-                int len = R2ProtocolEncode(&dataPacket, output, 256);
-
-                if (len >= 0) {
-                    putsUSBUSART(output, len);
-                    CDCTxService();
-                };
-                int i = 0;
-                for (i = 0; i < 10; i++)
-                        RFID[i] = 0;
+            else if (commandPacket.data[0] == 'O'){
+                //sprintf("%s", "received cmd to close");
+                if (chk % 10 == 0)
+                {
+                    printf("Servo Open\n");
+                    setServoSpeed(SERVO_OPEN);
+                    
+                    chk++;
+                }
             }
+        
+//            else if (strncmp(commandPacket.data, CMD_TOOLS, 1)==0){
+//                sprintf("got command for tools");
+//                sprintf(readBuffer,
+//                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
+//                    7, "DRAWER1", 2, "D1", 1, getToolStatus(), 2, "CD");
+//                putsUSBUSART(readBuffer);
+//                //sprintf("%s", "received request for tools");
+//                //send data using R2Protocol.h
+//                uint32_t dataLength = 1;
+//                uint8_t data[1] = {TOOLSTATUS};
+//
+//                struct R2ProtocolPacket dataPacket = {
+//                    "DRAWER1", "NUC", data, dataLength, "" 
+//                };
+//
+//                uint8_t output[CDC_DATA_OUT_EP_SIZE];
+//                int len = R2ProtocolEncode(&dataPacket, output, CDC_DATA_OUT_EP_SIZE);
+//
+//                if (len >= 0) {
+//                    putsUSBUSART(output);
+//                    CDCTxService();
+//                }
+//            }
+//            
+//            if (RFID != 0){
+//                sprintf(readBuffer,
+//                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
+//                    7, "DRAWER1", 2, "D1", 10, RFID, 2, "CD");
+//                putsUSBUSART(readBuffer);
+//                
+//                //send data using R2Protocol.h
+//                uint32_t dataLength = 10;
+//                uint8_t data[10] = {RFID};
+//
+//                struct R2ProtocolPacket dataPacket = {
+//                    "DRAWER1", "NUC", data, dataLength, "" 
+//                };
+//
+//                uint8_t output[256];
+//                int len = R2ProtocolEncode(&dataPacket, output, 256);
+//
+//                if (len >= 0) {
+//                    putsUSBUSART(output);
+//                    CDCTxService();
+//                };
+//            }
         }
         
     }//end while
-    PT_END(pt);
-}
-int main(void)
-{   
-	PPSInput(4, INT1, RPB0);
-	PPSInput(3, INT2, RPA4);
-    INTEnableSystemMultiVectoredInt();
-	ConfigINT1(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
-	ConfigINT2(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
-	
-    //initialize PWM and Limit Switches, Tool Switches, and RFID
-    InitializeSystem();
-
-    #if defined(USB_INTERRUPT)
-        USBDeviceAttach();
-    #endif
-
-    init_uart(); //initializes uart1 for rfid tx
-    //home();
-    
-    //init threads
-    PT_INIT(&pt1);
-    PT_INIT(&pt2);
-    
-    //round robin scheduling of threads
-    while(1)
-    {
-        PT_SCHEDULE(protothread1(&pt1));
-        PT_SCHEDULE(protothread2(&pt2));
-    }
 }//end main
 
 
@@ -416,7 +336,6 @@ static void InitializeSystem(void)
 	EnablePullUpA(BIT_4); //back limit switch
 	EnablePullUpB(BIT_0); //front limit switch
     initToolStatus();
-    initRFID();
 	
 }//end InitializeSystem
 
@@ -470,11 +389,22 @@ uint8_t getToolStatus(void) {
     uint8_t end = 1;
 
     uint8_t toolStatus = start + sw1 + sw2 + sw3 + sw4 + sw5 + sw6 + end;
+    TOOLSTATUS = toolStatus;
     return toolStatus;
 }
 
-void initRFID() {
-    
+void delay_ms(unsigned long i)
+{
+	/* Create a software delay about i ms long
+	 * Parameters:
+	 *      i:  equal to number of milliseconds for delay
+	 * Returns: Nothing
+	 * Note: Uses Core Timer. Core Timer is cleared at the initialiazion of
+	 *      this function. So, applications sensitive to the Core Timer are going
+	 *      to be affected
+	 */
+	UINT32 j;
+	j = 20000 * i;
+	WriteCoreTimer(0);
+	while (ReadCoreTimer() < j);
 }
-
-

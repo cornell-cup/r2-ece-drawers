@@ -55,6 +55,8 @@
 #include "../includes/Compiler.h"
 #include "../includes/usb/usb_config.h"
 #include "../includes/usb/usb_device.h"
+#include <stdio.h>
+#include <string.h>
 
 /** V A R I A B L E S ********************************************************/
 char USB_Out_Buffer[CDC_DATA_OUT_EP_SIZE];
@@ -64,8 +66,16 @@ unsigned char  NextUSBOut;
 //char RS232_In_Data;
 unsigned char    LastRS232Out;  // Number of characters in the buffer
 unsigned char    RS232cp;       // current position within the buffer
-unsigned char RS232_Out_Data_Rdy = 0;
+volatile unsigned char RS232_Out_Data_Rdy = 0;
 USB_HANDLE  lastTransmission;
+enum states {
+    NEW_TRANS,
+    GOT_START_TRANS,
+    GOT_PART_TRANS,
+    GOT_END_TRANS,
+    GOT_ENTIRE_TRANS
+};
+enum states state = NEW_TRANS;
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 //void ProcessIO(char* sourceBuffer, char* payloadBuffer, char* checksumBuffer, char* transactionBuffer);
@@ -97,203 +107,135 @@ void loadBuffer(uint8_t* copyBuffer, uint16_t copyLength);
  *
  * Note:            None
  *******************************************************************/
-int ProcessIO(char* sourceBuffer, char* payloadBuffer, char* checksumBuffer, char* transactionBuffer)
+int ProcessIO(struct R2ProtocolPacket *packet)
 {
+    int chk = 1; //0 once entire transmission sent. Stops while loop.s
+    static int partialTransIndex = 0; //tracks last index of partial transmissions for next part of transmission
     int result = 0;
     //Blink the LEDs according to the USB device status
-    BlinkUSBStatus();
+//    BlinkUSBStatus();
     // User Application USB tasks
-    if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1)) return;
+    while(chk == 1)
+    {
+        if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1)) return;
 
-	if (RS232_Out_Data_Rdy == 0)  // only check for new USB buffer if the old RS232 buffer is
-	{						  // empty.  This will cause additional USB packets to be NAK'd
-		LastRS232Out = getsUSBUSART(RS232_Out_Data,64); //until the buffer is free.
-        
-		if(LastRS232Out > 0)
-		{
-			RS232_Out_Data_Rdy = 1;  // signal buffer full
-			RS232cp = 0;  // Reset the current position
-		}
-	}
+        if (RS232_Out_Data_Rdy == 0)  // only check for new USB buffer if the old RS232 buffer is
+        {						  // empty.  This will cause additional USB packets to be NAK'd
+            LastRS232Out = getsUSBUSART(RS232_Out_Data,64); //until the buffer is free.
 
-    //Check if any bytes are waiting in the queue to send to the USB host.
-    //If any bytes are waiting, and the endpoint is available, prepare to
-    //send the USB packet to the host.
-    
-    if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady()){
-        memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
-        
-        enum states {   GET_START_PREFIX, GET_START,
-                        GET_HEADER, GET_LENGTH, GET_DATA, 
-                        GET_END_PREFIX, GET_END};
-        enum dataTypes { START='b', SOURCE, DESTINATION, 
-                         TRANSACTION, PAYLOAD, CHECKSUM,
-                         END};
-        
-        static uint8_t STATE = GET_START_PREFIX;
-        static uint8_t dataType = START;
-        static uint32_t dataLength = 0;
-        static int arrayIndex = 0;
-        
-        char START_TEXT[] = "00";
-        char END_TEXT[] = "01";
-        char SELF[] = WHOAMI;
-        
-        char symStart = 'G';
-        char symSource = 'S';
-        char symDestination = 'D';
-        char symTransactionId = 'T';
-        char symPayload = 'P';
-        char symChecksum = 'K';
-        char symEnd = 'G';
-        
-        int i;
-        
-        for (i=0; i<LastRS232Out; i++){
-            uint8_t c = USB_Out_Buffer[i];
-            uint8_t requiredType;
-            
-            switch (STATE){
-                case GET_START_PREFIX:
-                    dataType = START;
-                    if (c == symStart){
-                        arrayIndex = 0;
-                        STATE = GET_START;
-                        dataLength = 2;
-                    }
-                    break;
-                case GET_START:
-                    if (c != START_TEXT[arrayIndex]){
-                        STATE = GET_START_PREFIX;
-                        break;
-                    }
-                    arrayIndex++;
-                    if (arrayIndex == dataLength){
-                        STATE = GET_HEADER;
-                    }
-                    break;
-                case GET_HEADER:
-                    requiredType = dataType + 1;
-                    
-                    if (c == symSource) c = SOURCE;
-                    else if (c == symDestination) c = DESTINATION;
-                    else if (c == symTransactionId) c = TRANSACTION;
-                    else if (c == symPayload) c = PAYLOAD;
-                    else if (c == symChecksum) c = CHECKSUM;
-                    else if (c == symEnd) c = END;
-                    
-                    if (requiredType == c){
-                        dataType = requiredType;
-                        arrayIndex = 0;
-                        if (c == PAYLOAD){
-                            dataLength = 4;
-                        }
-                        else{
-                            dataLength = 1;
-                        }
-                        STATE = GET_LENGTH;
-                    }
-                    else {
-                        STATE = GET_START_PREFIX;
-                    }
-                    break;
-                case GET_LENGTH:
-                    readBuffer[arrayIndex++] = c;
-                    if (arrayIndex == dataLength){
-                        if (dataType == PAYLOAD){
-                            dataLength = ((uint32_t)(readBuffer[3])<<24) | 
-                                    ((uint32_t)(readBuffer[2])<<16) |
-                                    ((uint32_t)(readBuffer[1])<<8) | 
-                                    ((uint32_t)(readBuffer[0]));
-                        }
-                        else{
-                            dataLength = c;
-                        }
-                        arrayIndex = 0;
-                        STATE = GET_DATA;
-                    }
-//                    dataLength = c;
-//                    #ifdef LENGTH_IN_ASCII
-//                        dataLength = dataLength - '0';
-//                    #endif
-//                    if (dataLength < 0) dataLength = 0;
-//                    if (dataLength > MAX_LENGTH) dataLength = MAX_LENGTH;
-//                    arrayIndex = 0;
-//                    STATE = GET_DATA;
-                    break;
-                case GET_DATA:
-                    readBuffer[arrayIndex++] = c;
-                    if (arrayIndex == dataLength){
-                        if (dataType == SOURCE){
-                            memcpy(sourceBuffer, readBuffer, dataLength);
-                            sourceBuffer[dataLength] = '\0';
-                            STATE = GET_HEADER; 
-                        }
-                        else if (dataType == DESTINATION){
-                            readBuffer[dataLength] = '\0';
-                            if (strcmp(readBuffer, SELF)){
-                                // not aimed at self
-                                STATE = GET_START_PREFIX;
-                            }
-                            else{
-                                STATE = GET_HEADER;
-                            }
-                        }
-                        else if (dataType == TRANSACTION){
-                            memcpy(transactionBuffer, readBuffer, dataLength);
-                            transactionBuffer[dataLength] = '\0';
-                            STATE = GET_HEADER;
-                        }
-                        else if (dataType == PAYLOAD){
-                            memcpy(payloadBuffer, readBuffer, dataLength);
-                            payloadBuffer[dataLength] = '\0';
-                            STATE = GET_HEADER;
-                        }
-                        else if (dataType == CHECKSUM){
-                            memcpy(checksumBuffer, readBuffer, dataLength);
-                            checksumBuffer[dataLength] = '\0';
-                            STATE = GET_END_PREFIX;
-                        }
-                    }
-                    break;
-                case GET_END_PREFIX:
-                    if (c == symEnd){
-                        STATE = GET_END;
-                        arrayIndex = 0;
-                        dataLength = 2;
-                    }
-                    else{
-                        STATE = GET_START_PREFIX;
-                    }
-                    break;
-                case GET_END:
-                    if (c != END_TEXT[arrayIndex]){
-                        STATE = GET_START_PREFIX;
-                        break;
-                    }
-                    arrayIndex++;
-                    if (arrayIndex == dataLength){
-                        // valid data packet
-//                        sprintf(readBuffer,
-//                                    "S: %s\n\rT: %s\n\rP: %s\n\rK: %s\n\r",
-//                                        sourceBuffer, transactionBuffer,
-//                                            payloadBuffer, checksumBuffer);
-//                        putsUSBUSART(readBuffer);
-                        STATE = GET_START_PREFIX;
-                        result = 1;
-                    }
-                    break;
+            if(LastRS232Out > 0)
+            {
+                RS232_Out_Data_Rdy = 1;  // signal buffer full
+                RS232cp = 0;  // Reset the current position
             }
         }
-        
-        RS232_Out_Data_Rdy = 0;
-    }
-
-    CDCTxService();
-    
+        //Check if any bytes are waiting in the queue to send to the USB host.
+        //If any bytes are waiting, and the endpoint is available, prepare to
+        //send the USB packet to the host.
+        if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady())
+        {
+            int i;
+            //memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
+            int index;
+            switch(state)
+            {
+                case NEW_TRANS:
+                    if (gotEND(RS232_Out_Data, LastRS232Out) && gotSTART(RS232_Out_Data))
+                    {
+                        //entire transmission sent
+                        memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
+                        state = GOT_ENTIRE_TRANS;
+                    }
+                    else if (gotSTART(RS232_Out_Data))
+                    {
+                        //start of transmission sent, but not complete
+                        state = GOT_START_TRANS;
+                    }
+                    else if (gotEND(RS232_Out_Data, LastRS232Out))
+                    {
+                        //got partial transmission containing end
+                        state = GOT_END_TRANS;
+                    }
+                    else
+                    {
+                        //got partial transmission w/o start or end
+                        state = GOT_PART_TRANS;
+                    }
+                    break;       
+                case GOT_START_TRANS:
+                    for (index = 0; index < LastRS232Out; index++)
+                    {
+                        USB_Out_Buffer[index] = RS232_Out_Data[index];
+                    }
+                    partialTransIndex = index;
+                    partialTransIndex++;
+                    state = NEW_TRANS;
+                    break;
+                case GOT_PART_TRANS:
+                    for (index = partialTransIndex; index < LastRS232Out + partialTransIndex; index++)
+                    {
+                        USB_Out_Buffer[index] = RS232_Out_Data[index];
+                    }
+                    partialTransIndex = index;
+                    partialTransIndex++;
+                    state = NEW_TRANS;
+                    break;
+                    
+                case GOT_END_TRANS:
+                    for (index = partialTransIndex; index < LastRS232Out + partialTransIndex; index++)
+                    {
+                        USB_Out_Buffer[index] = RS232_Out_Data[index];
+                    }
+                    state = GOT_ENTIRE_TRANS;
+                    break;
+                case GOT_ENTIRE_TRANS:
+                    if(R2ProtocolDecode(USB_Out_Buffer, LastRS232Out, packet) != -1) 
+                    {
+                         result = 1;
+                    } 
+                    RS232_Out_Data_Rdy = 0;
+                    state = NEW_TRANS;
+                    chk = 0;
+                    break;
+            }
+            CDCTxService();
+        }
+    } //end while  
     return result;
 
 }//end ProcessIO
+
+/*
+ * Returns 1 if buffer contains end sequence, 0 otherwise.
+ */
+int gotEND(char * buffer, int buf_length)
+{
+    int i = buf_length - 3;
+    if (buffer[i] == 'G') {
+        if (buffer[i+1] == '0') {
+            if (buffer[i+2] == '1') {
+                return 1; 
+            }
+        }
+    }
+    return 0;
+}
+
+/*
+ * Returns 1 if buffer contains start sequence, 0 otherwise.
+ */
+int gotSTART(char * buffer)
+{
+    int i = 0;
+    if (buffer[i] == 'G') {
+        if (buffer[i+1] == '0') {
+            if (buffer[i+2] == '0') {
+                return 1; 
+            }
+        }
+    }
+    return 0;
+}
 
 /******************************************************************************
  * Function:        void mySetLineCodingHandler(void)
@@ -391,73 +333,73 @@ void mySetLineCodingHandler(void)
  *******************************************************************/
 void BlinkUSBStatus(void)
 {
-    static WORD led_count=0;
-    
-    if(led_count == 0)led_count = 10000U;
-    led_count--;
-
-    #define mLED_Both_Off()         {mLED_1_Off();mLED_2_Off();}
-    #define mLED_Both_On()          {mLED_1_On();mLED_2_On();}
-    #define mLED_Only_1_On()        {mLED_1_On();mLED_2_Off();}
-    #define mLED_Only_2_On()        {mLED_1_Off();mLED_2_On();}
-
-    if(USBSuspendControl == 1)
-    {
-        if(led_count==0)
-        {
-            mLED_1_Toggle();
-            if(mGetLED_1())
-            {
-                mLED_2_On();
-            }
-            else
-            {
-                mLED_2_Off();
-            }
-        }//end if
-    }
-    else
-    {
-        if(USBDeviceState == DETACHED_STATE)
-        {
-            mLED_Both_Off();
-        }
-        else if(USBDeviceState == ATTACHED_STATE)
-        {
-            mLED_Both_On();
-        }
-        else if(USBDeviceState == POWERED_STATE)
-        {
-            mLED_Only_1_On();
-        }
-        else if(USBDeviceState == DEFAULT_STATE)
-        {
-            mLED_Only_2_On();
-        }
-        else if(USBDeviceState == ADDRESS_STATE)
-        {
-            if(led_count == 0)
-            {
-                mLED_1_Toggle();
-                mLED_2_Off();
-            }//end if
-        }
-        else if(USBDeviceState == CONFIGURED_STATE)
-        {
-            if(led_count==0)
-            {
-                mLED_1_Toggle();
-                if(mGetLED_1())
-                {
-                    mLED_2_Off();
-                }
-                else
-                {
-                    mLED_2_On();
-                }
-            }//end if
-        }//end if(...)
-    }//end if(UCONbits.SUSPND...)
+//    static WORD led_count=0;
+//    
+//    if(led_count == 0)led_count = 10000U;
+//    led_count--;
+//
+//    #define mLED_Both_Off()         {mLED_1_Off();mLED_2_Off();}
+//    #define mLED_Both_On()          {mLED_1_On();mLED_2_On();}
+//    #define mLED_Only_1_On()        {mLED_1_On();mLED_2_Off();}
+//    #define mLED_Only_2_On()        {mLED_1_Off();mLED_2_On();}
+//
+//    if(USBSuspendControl == 1)
+//    {
+//        if(led_count==0)
+//        {
+//            mLED_1_Toggle();
+//            if(mGetLED_1())
+//            {
+//                mLED_2_On();
+//            }
+//            else
+//            {
+//                mLED_2_Off();
+//            }
+//        }//end if
+//    }
+//    else
+//    {
+//        if(USBDeviceState == DETACHED_STATE)
+//        {
+//            mLED_Both_Off();
+//        }
+//        else if(USBDeviceState == ATTACHED_STATE)
+//        {
+//            mLED_Both_On();
+//        }
+//        else if(USBDeviceState == POWERED_STATE)
+//        {
+//            mLED_Only_1_On();
+//        }
+//        else if(USBDeviceState == DEFAULT_STATE)
+//        {
+//            mLED_Only_2_On();
+//        }
+//        else if(USBDeviceState == ADDRESS_STATE)
+//        {
+//            if(led_count == 0)
+//            {
+//                mLED_1_Toggle();
+//                mLED_2_Off();
+//            }//end if
+//        }
+//        else if(USBDeviceState == CONFIGURED_STATE)
+//        {
+//            if(led_count==0)
+//            {
+//                mLED_1_Toggle();
+//                if(mGetLED_1())
+//                {
+//                    mLED_2_Off();
+//                }
+//                else
+//                {
+//                    mLED_2_On();
+//                }
+//            }//end if
+//        }//end if(...)
+//    }//end if(UCONbits.SUSPND...)
 
 }//end BlinkUSBStatus
 
