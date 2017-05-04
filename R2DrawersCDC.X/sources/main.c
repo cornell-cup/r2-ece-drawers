@@ -82,9 +82,9 @@
 
 #define PERIOD      50000   // 20 ms
 #define SERVO_MIN   2000    // 1000 us
-#define SERVO_REST  3705    // 1500 us
+#define SERVO_REST  3685    // 1500 us
 #define SERVO_MAX   5000    // 2000 us
-#define SERVO_RUN_SPEED     25     //400 us
+#define SERVO_RUN_SPEED     30     //400 us
 #define SERVO_OPEN  (SERVO_REST + SERVO_RUN_SPEED)
 #define SERVO_CLOSE (SERVO_REST - SERVO_RUN_SPEED)
 
@@ -132,11 +132,11 @@ int main(void)
         delay_ms(100);
     }
     mPORTAClearBits(BIT_0);
-	PPSInput(4, INT1, RPB0);
-	PPSInput(3, INT2, RPA4);
+//	PPSInput(4, INT1, RPB0);
+//	PPSInput(3, INT2, RPA4);
 	init_uart();
-	ConfigINT1(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
-	ConfigINT2(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+//	ConfigINT1(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+//	ConfigINT2(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
 	
     //initialize PWM and Limit Switches, Tool Switches, and RFID
     InitializeSystem();
@@ -147,7 +147,6 @@ int main(void)
 
     while(1)
     {	
-        continue;
         #if defined(USB_POLLING)
 		// Check bus status and service USB interrupts.
         USBDeviceTasks(); // Interrupt or polling method.  If using polling, must call
@@ -180,35 +179,42 @@ int main(void)
         uint8_t packetData[32] = {0};
         commandPacket.data_len = 32;
         commandPacket.data = packetData;
-
-        int result = ProcessIO(&commandPacket); 
+        int result = ProcessIO(&commandPacket);
         
-        printf("Result: %d\n:", result);
+        if (result == 1)
+        {
+            printf("Result: %d\n:", result);
+            printf("%c\n", commandPacket.data[0]);
+        }
+        continue;
         
-        
- 
-        int chk = 0;
+        int ck = 0;
         if (result == 1){
            // new data available
             //setServoSpeed(4000);
             if (commandPacket.data[0] == 'C'){
-                if (chk % 10 == 0)
+                if (ck % 1 == 0)
                 {
                 //sprintf("%s", "received cmd to open");
                     printf("Servo Close\n");
-                    setServoSpeed(SERVO_CLOSE);
-                    
-                    chk++;
+                    for (i = 3685; i >= 3660; i--)
+                    {
+                        setServoSpeed(i);
+                    }
+                    ck++;
                 }
             }
             else if (commandPacket.data[0] == 'O'){
                 //sprintf("%s", "received cmd to close");
-                if (chk % 10 == 0)
+                if (ck % 1 == 0)
                 {
                     printf("Servo Open\n");
-                    setServoSpeed(SERVO_OPEN);
+                    for (i = 3685; i <= 3710; i++)
+                    {
+                        setServoSpeed(i);
+                    }
                     
-                    chk++;
+                    ck++;
                 }
             }
         
