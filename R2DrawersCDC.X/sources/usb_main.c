@@ -62,12 +62,22 @@
 char USB_Out_Buffer[CDC_DATA_OUT_EP_SIZE];
 char RS232_Out_Data[CDC_DATA_IN_EP_SIZE];
 
+
+    
 unsigned char  NextUSBOut;
 //char RS232_In_Data;
 unsigned char    LastRS232Out;  // Number of characters in the buffer
 unsigned char    RS232cp;       // current position within the buffer
 volatile unsigned char RS232_Out_Data_Rdy = 0;
 USB_HANDLE  lastTransmission;
+enum states {
+    NEW_TRANS,
+    GOT_START_TRANS,
+    GOT_PART_TRANS,
+    GOT_END_TRANS,
+    GOT_ENTIRE_TRANS
+};
+enum states state = NEW_TRANS;
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 //void ProcessIO(char* sourceBuffer, char* payloadBuffer, char* checksumBuffer, char* transactionBuffer);
@@ -82,7 +92,8 @@ void loadBuffer(uint8_t* copyBuffer, uint16_t copyLength);
 /********************************************************************
  * Function:        void ProcessIO(void)
  *
- * PreCondition:    None
+ * PreCondition:    New packet sent must be at least 3 bytes in length (good for
+ *                  stuff ending in G01).
  *
  * Input:           sourceBuffer 
  *                  payloadBuffer
@@ -101,64 +112,173 @@ void loadBuffer(uint8_t* copyBuffer, uint16_t copyLength);
  *******************************************************************/
 int ProcessIO(struct R2ProtocolPacket *packet)
 {
+    //printf("Out of while loop\n");
+    volatile int partialTransIndex = 0; //tracks last index of partial transmissions for next part of transmission
+    volatile int transSize = 0; //keeps track of overall transmission size for R2ProtocolDecode
+    int chk = 1; //0 once entire transmission sent. Stops while loop.s
     int result = 0;
+   
     //Blink the LEDs according to the USB device status
 //    BlinkUSBStatus();
     // User Application USB tasks
-    if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1)) return;
-
-	if (RS232_Out_Data_Rdy == 0)  // only check for new USB buffer if the old RS232 buffer is
-	{						  // empty.  This will cause additional USB packets to be NAK'd
-		LastRS232Out = getsUSBUSART(RS232_Out_Data,64); //until the buffer is free.
-        
-		if(LastRS232Out > 0)
-		{
-			RS232_Out_Data_Rdy = 1;  // signal buffer full
-			RS232cp = 0;  // Reset the current position
-		}
-	}
-
-    //Check if any bytes are waiting in the queue to send to the USB host.
-    //If any bytes are waiting, and the endpoint is available, prepare to
-    //send the USB packet to the host.
-//    int i = LastRS232Out - 3;
-//    int arrayIndex = 0;
-//    int dataLength = 2;
-//    if (RS232_Out_Data[i] == 'G')
-//    {
-//        if (RS232_Out_Data[i+1] == '0')
-//        {
-//            if (RS232_Out_Data[i+2] == '1')
-//            {
-//                if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady())
-//                {
-//                   memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
-//                   if(R2ProtocolDecode(USB_Out_Buffer ,LastRS232Out, packet) != -1) 
-//                   {
-//                        result = 1;
-//                        RS232_Out_Data_Rdy = 0;
-//                   } 
-//                }
-//            }
-//        }
-//    }
-    
-    if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady())
+    while(chk == 1)
     {
-       memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
-       if(R2ProtocolDecode(USB_Out_Buffer ,LastRS232Out, packet) != -1) 
-       {
-            result = 1;
-            RS232_Out_Data_Rdy = 0;
-       } 
-    }
-    
+        if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1)) return 2;
 
-    CDCTxService();
-    
+        if (RS232_Out_Data_Rdy == 0)  // only check for new USB buffer if the old RS232 buffer is
+        {						  // empty.  This will cause additional USB packets to be NAK'd
+            LastRS232Out = getsUSBUSART(RS232_Out_Data,64); //until the buffer is free.
+            
+            if(LastRS232Out > 0)
+            {
+                RS232_Out_Data_Rdy = 1;  // signal buffer full
+                RS232cp = 0;  // Reset the current position
+            }
+            else 
+            {
+                chk = 0;
+            }
+        }
+        //Check if any bytes are waiting in the queue to send to the USB host.
+        //If any bytes are waiting, and the endpoint is available, prepare to
+        //send the USB packet to the host.
+        if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady())
+        {
+            
+            int i;
+            //memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
+            int index;
+            
+            switch(state)
+            {
+                case NEW_TRANS:
+                    if (gotEND(RS232_Out_Data, LastRS232Out) && gotSTART(RS232_Out_Data))
+                    {
+                        //entire transmission sent
+                        memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
+                        printf("Length: %d\n", LastRS232Out);
+                        state = GOT_ENTIRE_TRANS;
+                    }
+                    else if (gotSTART(RS232_Out_Data))
+                    {
+                        //start of transmission sent, but not complete
+                        state = GOT_START_TRANS;
+                        printf("got start: %d\n", LastRS232Out);
+                    }
+                    else if (gotEND(RS232_Out_Data, LastRS232Out))
+                    {
+                        //got partial transmission containing end
+                        state = GOT_END_TRANS;
+                        printf("got end: %d\n", LastRS232Out);
+                    }
+                    else
+                    {
+                        //got partial transmission w/o start or end
+                        state = GOT_PART_TRANS;
+                        printf("got partial: %d\n", LastRS232Out);
+                    }
+                    break;       
+                case GOT_START_TRANS:
+                    printf("Got Start\n");
+                    memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
+                    partialTransIndex+=LastRS232Out;
+                    printf("Start Transmission: %d\n", partialTransIndex);
+                    for (index = 0; index < LastRS232Out; index++)
+                    {
+                        printf("%c", USB_Out_Buffer[index]);
+                    }
+                    printf("\n");
+                    state = NEW_TRANS;
+                    transSize += LastRS232Out;
+                    RS232_Out_Data_Rdy = 0;
+                    break;
+                case GOT_PART_TRANS:
+                    printf("Got Part Trans\n");
+                    memcpy((USB_Out_Buffer + partialTransIndex), RS232_Out_Data, LastRS232Out);
+                    partialTransIndex+=LastRS232Out;
+                    printf("Part Transmission: %d\n", partialTransIndex);
+                    for (index = 0; index < partialTransIndex; index++)
+                    {
+                        printf("%c", USB_Out_Buffer[index]);
+                    }
+                    printf("\n");
+                    state = NEW_TRANS;
+                    transSize += LastRS232Out;
+                    RS232_Out_Data_Rdy = 0;
+                    break;
+                    
+                case GOT_END_TRANS:
+                    printf("Got End Trans\n");
+                    memcpy((USB_Out_Buffer + partialTransIndex), RS232_Out_Data, LastRS232Out);
+                    state = GOT_ENTIRE_TRANS;
+                    for (index = partialTransIndex; index < LastRS232Out + partialTransIndex; index++)
+                    {
+                        printf("%c", USB_Out_Buffer[index]);
+                    }
+                    printf("\n");
+                    transSize += LastRS232Out; //for some reason isn't keeping old transSize, check this later. Rn 32 is hardcoded into R2ProtocolDecode
+                    printf("endtransSize: %d\n", transSize);
+                    break;
+                case GOT_ENTIRE_TRANS:
+                    //transSize += LastRS232Out;
+                    //printf("transSize: %d\n", partialTransIndex);
+                    printf("Entire trans: \n");
+                    for (index = 0; index < 32; index++)
+                    {
+                        printf("%c", USB_Out_Buffer[index]);
+                    }
+                    printf("\n");
+                    
+                    if(R2ProtocolDecode(USB_Out_Buffer, 32, packet) != -1) 
+                    {
+                         result = 1;
+                    } 
+                    RS232_Out_Data_Rdy = 0;
+                    state = NEW_TRANS;
+                    chk = 0;
+                    
+                    break;
+            } //end switch
+            
+        }//end if
+        CDCTxService();
+    } //end while  
+    delay_ms(200);
     return result;
 
 }//end ProcessIO
+
+/*
+ * Returns 1 if buffer contains end sequence, 0 otherwise.
+ */
+int gotEND(char * buffer, int buf_length)
+{
+    int i = buf_length - 3;
+    if (buffer[i] == 'G') {
+        if (buffer[i+1] == '0') {
+            if (buffer[i+2] == '1') {
+                return 1; 
+            }
+        }
+    }
+    return 0;
+}
+
+/*
+ * Returns 1 if buffer contains start sequence, 0 otherwise.
+ */
+int gotSTART(char * buffer)
+{
+    int i = 0;
+    if (buffer[i] == 'G') {
+        if (buffer[i+1] == '0') {
+            if (buffer[i+2] == '0') {
+                return 1; 
+            }
+        }
+    }
+    return 0;
+}
 
 /******************************************************************************
  * Function:        void mySetLineCodingHandler(void)
