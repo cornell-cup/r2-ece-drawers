@@ -4,7 +4,7 @@
 
 -usb_main.c contains ProcessIO(), which takes in a data packet struct and puts in
 the usb transmission information into the struct. Returns 1 if successfully put into data packet,
-and returns 0 if not. Look at R2Protocol.h for struct format.
+and returns 0 if not. Look at R2Protocol.h for struct format. Struct's data_len and data fields need to be instantiated to some initial value after it is created, otherwise R2ProtocolDecode will not work. 
 ProcessIO() gets the usb transmission all at once, or builds it from multiple transmissions,
 and then calls R2ProtocolDecode, which is the function that puts the transmission into the struct.
 
