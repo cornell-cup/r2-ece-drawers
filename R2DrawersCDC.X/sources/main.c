@@ -82,9 +82,9 @@
 
 #define PERIOD      50000   // 20 ms
 #define SERVO_MIN   2000    // 1000 us
-#define SERVO_REST  3750    // 1500 us
+#define SERVO_REST  3680    // 1500 us
 #define SERVO_MAX   5000    // 2000 us
-#define SERVO_RUN_SPEED     100     //400 us
+#define SERVO_RUN_SPEED     30     //400 us
 #define SERVO_OPEN  (SERVO_REST + SERVO_RUN_SPEED)
 #define SERVO_CLOSE (SERVO_REST - SERVO_RUN_SPEED)
 
@@ -98,6 +98,7 @@ static void InitializeSystem(void);
 void initPWM(void);
 void setServoSpeed(int speed);
 void initToolStatus(void);
+void delay_ms(unsigned long i);
 uint8_t getToolStatus(void);
 
 /******************************************************************************
@@ -118,9 +119,22 @@ uint8_t getToolStatus(void);
 
 int main(void)
 {   
+    mPORTASetPinsDigitalOut(BIT_0);
+    int i;
+    for (i = 0; i < 12; i++)
+    {
+        mPORTAToggleBits(BIT_0);
+        delay_ms(250);
+    }
+    for (i = 0; i < 12; i++)
+    {
+        mPORTAToggleBits(BIT_0);
+        delay_ms(100);
+    }
+    mPORTAClearBits(BIT_0);
 	PPSInput(4, INT1, RPB0);
 	PPSInput(3, INT2, RPA4);
-		
+	init_uart();
 	ConfigINT1(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
 	ConfigINT2(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
 	
@@ -150,7 +164,7 @@ int main(void)
         #endif
 
         OpenTimer1(T1_ON | T1_PS_1_256, 0xFFFF);
-        init_uart();
+        
 //        char sourceBuffer[2] = {0};
 //        char transactionBuffer[2] = {0};
 //        char payloadBuffer[1] = {0};
@@ -160,53 +174,75 @@ int main(void)
 		// Application related code may be added here, or in the ProcessIO() function.
         //int result = ProcessIO(sourceBuffer, payloadBuffer, checksumBuffer, transactionBuffer);
         
-        printf("\r\n");
+        printf("");
         struct R2ProtocolPacket commandPacket;  //struct to store command received
         uint8_t packetData[32] = {0};
         commandPacket.data_len = 32;
         commandPacket.data = packetData;
-
-        int result = ProcessIO(&commandPacket); 
+        int result = ProcessIO(&commandPacket);
         
-        /* the buffers now contain relevant information;
-         * they are updated if result == 1; otherwise, it's old info
-         */
-        printf("%c", commandPacket.data[0]);
+        if (result == 1)
+        {
+            printf("Result: %d\n:", result);
+            printf("%c\n", commandPacket.data[0]);
+        }
+        //continue;
         
-        if (result == 1){
+        int ck = 0;
+        if (result == 1)
+        {
            // new data available
- 
-            if (strncmp(commandPacket.data, CMD_OPEN, 1)==0){
+            //setServoSpeed(4000);
+            if (commandPacket.data[0] == 'C'){
+                if (ck % 1 == 0)
+                {
                 //sprintf("%s", "received cmd to open");
-                setServoSpeed(SERVO_OPEN);
+                    printf("Servo Close\n");
+                    setServoSpeed(3600);
+//                    for (i = 3685; i >= 3650; i--)
+//                    {
+//                        setServoSpeed(i);
+//                        delay_ms(50);
+//                    }
+//                    ck++;
+                }
             }
-            else if (strncmp(commandPacket.data, CMD_CLOSE, 1)==0){
+            else if (commandPacket.data[0] == 'O'){
                 //sprintf("%s", "received cmd to close");
-                setServoSpeed(SERVO_MIN);
+                if (ck % 1 == 0)
+                {
+                    printf("Servo Open\n");
+                    setServoSpeed(3770);
+//                    for (i = 3685; i <= 3720; i++)
+//                    {
+//                        setServoSpeed(i);
+//                        delay_ms(50);
+//                    }
+                    
+                    ck++;
+                }
             }
-//            else if (strncmp(commandPacket.data, CMD_TOOLS, 1)==0){
-//                sprintf("got command for tools");
-//                sprintf(readBuffer,
-//                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
-//                    7, "DRAWER1", 2, "D1", 1, getToolStatus(), 2, "CD");
-//                putsUSBUSART(readBuffer);
-//                //sprintf("%s", "received request for tools");
-//                //send data using R2Protocol.h
-//                uint32_t dataLength = 1;
-//                uint8_t data[1] = {TOOLSTATUS};
-//
-//                struct R2ProtocolPacket dataPacket = {
-//                    "DRAWER1", "NUC", data, dataLength, "" 
-//                };
-//
-//                uint8_t output[CDC_DATA_OUT_EP_SIZE];
-//                int len = R2ProtocolEncode(&dataPacket, output, CDC_DATA_OUT_EP_SIZE);
-//
-//                if (len >= 0) {
-//                    putsUSBUSART(output);
-//                    CDCTxService();
-//                }
-//            }
+        
+            else if (commandPacket.data[0] == 'T')
+            {
+                //printf("got command for tools\n");
+                uint8_t data = getToolStatus();
+
+                int dataLength = 1; 
+                struct R2ProtocolPacket dataPacket = {
+                    "DRAWER1", "PI","", dataLength, &data, "" 
+                };
+                uint8_t output[31];
+                int len = R2ProtocolEncode(&dataPacket, output, 31);
+                printf("%s\n", output);
+                printf("Got T\n");
+                if (len >= 0) {
+                    //printf("Packet about to be sent out!");
+                    putUSBUSART((char *) output, len);
+                    printf("Packet sent out!");
+                    CDCTxService();
+                }
+            }
 //            
 //            if (RFID != 0){
 //                sprintf(readBuffer,
@@ -361,6 +397,21 @@ uint8_t getToolStatus(void) {
     uint8_t end = 1;
 
     uint8_t toolStatus = start + sw1 + sw2 + sw3 + sw4 + sw5 + sw6 + end;
-    TOOLSTATUS = toolStatus;
     return toolStatus;
+}
+
+void delay_ms(unsigned long i)
+{
+	/* Create a software delay about i ms long
+	 * Parameters:
+	 *      i:  equal to number of milliseconds for delay
+	 * Returns: Nothing
+	 * Note: Uses Core Timer. Core Timer is cleared at the initialiazion of
+	 *      this function. So, applications sensitive to the Core Timer are going
+	 *      to be affected
+	 */
+	UINT32 j;
+	j = 20000 * i;
+	WriteCoreTimer(0);
+	while (ReadCoreTimer() < j);
 }
