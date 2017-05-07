@@ -113,8 +113,8 @@ void loadBuffer(uint8_t* copyBuffer, uint16_t copyLength);
 int ProcessIO(struct R2ProtocolPacket *packet)
 {
     //printf("Out of while loop\n");
-    volatile int partialTransIndex = 0; //tracks last index of partial transmissions for next part of transmission
-    volatile int transSize = 0; //keeps track of overall transmission size for R2ProtocolDecode
+    int partialTransIndex = 0; //tracks last index of partial transmissions for next part of transmission
+    int transSize = 0; //keeps track of overall transmission size for R2ProtocolDecode
     int chk = 1; //0 once entire transmission sent. Stops while loop.s
     int result = 0;
    
@@ -144,7 +144,6 @@ int ProcessIO(struct R2ProtocolPacket *packet)
         //send the USB packet to the host.
         if (RS232_Out_Data_Rdy && USBUSARTIsTxTrfReady())
         {
-            
             int i;
             //memcpy(USB_Out_Buffer, RS232_Out_Data, LastRS232Out);
             int index;

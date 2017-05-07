@@ -17,6 +17,7 @@
       <itemPath>includes/usb/usb_device_local.h</itemPath>
       <itemPath>includes/usb_main.h</itemPath>
       <itemPath>R2Protocol.h</itemPath>
+      <itemPath>protothreads.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"

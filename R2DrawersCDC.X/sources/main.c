@@ -70,6 +70,8 @@
 #include "../includes/uart_init.h"
 #include "../includes/uart_init.c"
 #include "../includes/R2Protocol.h"
+#include "../protothreads.h"
+
 
 
 #define EnablePullUpB(bits) CNPDBCLR=bits; CNPUBSET=bits;
@@ -82,17 +84,29 @@
 
 #define PERIOD      50000   // 20 ms
 #define SERVO_MIN   2000    // 1000 us
-#define SERVO_REST  3685    // 1500 us
+#define SERVO_REST  3680    // 1500 us
 #define SERVO_MAX   5000    // 2000 us
 #define SERVO_RUN_SPEED     30     //400 us
 #define SERVO_OPEN  (SERVO_REST + SERVO_RUN_SPEED)
 #define SERVO_CLOSE (SERVO_REST - SERVO_RUN_SPEED)
 
 /** V A R I A B L E S ********************************************************/
-char RFID[10] = {0};
+unsigned char RFID[10] = {0}; //stores RFID transmissions
+unsigned char rxchar = '0'; //receives a byte
+int rfid_ready = 0; //tells drawer thread that RFID buffer is correct, send to R2bot over USB
 char TOOLSTATUS;
 extern char USB_Out_Buffer[CDC_DATA_OUT_EP_SIZE];
+enum states1 {
+    WAIT_TRANSMIT, //wait for STX byte to be sent from RFID module
+    STX_RECEIVED,  //get 10 data bytes, CR+LF, ETX byte. 
+    ETX_RECEIVED,  //check if checksum is correct
+    CHECKSUM_CORRECT //print 10 data bytes + checksum
+};
 
+enum states1 rfid_state = WAIT_TRANSMIT;
+
+//thread control struct
+static struct pt pt1, pt2;
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 static void InitializeSystem(void);
 void initPWM(void);
@@ -117,26 +131,102 @@ uint8_t getToolStatus(void);
  * Note:            None
  *****************************************************************************/
 
-int main(void)
+static PT_THREAD (protothread1(struct pt *pt))
+{
+    PT_BEGIN(pt);
+    unsigned char checkSum[50] = {0}; //stores converted ASCII to hex from rfid_buffer
+    unsigned char actualCS1 = '0';
+    unsigned char actualCS2 = '0';
+    
+    int j = 0; 
+    while (1)
+    {
+        switch(rfid_state)
+        {
+            case WAIT_TRANSMIT:
+                while(!UARTReceivedDataIsAvailable(UART1)){}; //await transmission
+                rxchar = UARTGetDataByte(UART1);
+                if (rxchar == 2)
+                    rfid_state = STX_RECEIVED;
+                break;
+            case STX_RECEIVED:
+                for (j = 0; j < 10; j++) //get next 10 data bytes
+                {
+                   while(!UARTReceivedDataIsAvailable(UART1)){};
+                   RFID[j] = UARTGetDataByte(UART1); 
+                }
+                while(!UARTReceivedDataIsAvailable(UART1)){};
+                actualCS1 = UARTGetDataByte(UART1); //receive first checksum byte
+                while(!UARTReceivedDataIsAvailable(UART1)){};
+                actualCS2 = UARTGetDataByte(UART1);//receive second checksum byte
+            
+                for (j = 0; j < 2; j++) //receives CR + LF
+                {
+                   while(!UARTReceivedDataIsAvailable(UART1)){};
+                   UARTGetDataByte(UART1);
+                }
+                while(!UARTReceivedDataIsAvailable(UART1)){};
+                rxchar = UARTGetDataByte(UART1); //receives ETX character, stores in rxchar              
+                if (rxchar == 3)
+                    rfid_state = ETX_RECEIVED;
+                else
+                {
+                    rfid_state = WAIT_TRANSMIT;
+                    for (j = 0; j < 10; j++)
+                    {
+                        RFID[j] = 0;
+                    }
+                }
+                break;
+            case ETX_RECEIVED:
+                for (j = 0; j < 10; j++) //converts ascii from rfid_buffer to hex into checkSum
+                {
+                    char x = RFID[j];
+                    if (x < 58 && x > 47)
+                        x = x - 48;
+                    else 
+                        x = x - 55;
+                    checkSum[j] = x;
+                }
+                char CS1 = checkSum[0] ^ checkSum[2] ^ 
+                checkSum[4] ^ checkSum[6] ^ checkSum[8]; //calculates 1st checksum byte
+                char CS2 = checkSum[1] ^ checkSum[3] ^ 
+                checkSum[5] ^ checkSum[7] ^ checkSum[9];//calculates 2nd checksum byte
+           
+                if (CS1 < 10)
+                    CS1 = CS1 + 48;
+                else 
+                    CS1 = CS1 + 55;
+                if (CS2 < 10)
+                    CS2 = CS2 + 48;
+                else 
+                    CS2 = CS2 + 55;
+                
+                if ((CS1 == actualCS1) && (CS2 == actualCS2)) //if checksum is correct and ETX received
+                    rfid_state = CHECKSUM_CORRECT;
+                else
+                {
+                    rfid_state = WAIT_TRANSMIT;
+                    for (j = 0; j < 10; j++)
+                    {
+                        RFID[j] = 0;
+                    }
+                }
+                break;
+            case CHECKSUM_CORRECT:
+                //rfid_buffer contains the correct 10 ascii bytes
+                rfid_ready = 1;
+                rfid_state = WAIT_TRANSMIT;
+                break;      
+        }  
+    }
+    PT_END(pt);
+}
+
+static PT_THREAD (protothread2(struct pt *pt))
 {   
-    mPORTASetPinsDigitalOut(BIT_0);
-    int i;
-    for (i = 0; i < 12; i++)
-    {
-        mPORTAToggleBits(BIT_0);
-        delay_ms(250);
-    }
-    for (i = 0; i < 12; i++)
-    {
-        mPORTAToggleBits(BIT_0);
-        delay_ms(100);
-    }
-    mPORTAClearBits(BIT_0);
-//	PPSInput(4, INT1, RPB0);
-//	PPSInput(3, INT2, RPA4);
-	init_uart();
-//	ConfigINT1(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
-//	ConfigINT2(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+    PT_BEGIN(pt);
+    
 	
     //initialize PWM and Limit Switches, Tool Switches, and RFID
     InitializeSystem();
@@ -186,10 +276,11 @@ int main(void)
             printf("Result: %d\n:", result);
             printf("%c\n", commandPacket.data[0]);
         }
-        continue;
+        //continue;
         
         int ck = 0;
-        if (result == 1){
+        if (result == 1)
+        {
            // new data available
             //setServoSpeed(4000);
             if (commandPacket.data[0] == 'C'){
@@ -197,11 +288,13 @@ int main(void)
                 {
                 //sprintf("%s", "received cmd to open");
                     printf("Servo Close\n");
-                    for (i = 3685; i >= 3660; i--)
-                    {
-                        setServoSpeed(i);
-                    }
-                    ck++;
+                    setServoSpeed(3600);
+//                    for (i = 3685; i >= 3650; i--)
+//                    {
+//                        setServoSpeed(i);
+//                        delay_ms(50);
+//                    }
+//                    ck++;
                 }
             }
             else if (commandPacket.data[0] == 'O'){
@@ -209,66 +302,96 @@ int main(void)
                 if (ck % 1 == 0)
                 {
                     printf("Servo Open\n");
-                    for (i = 3685; i <= 3710; i++)
-                    {
-                        setServoSpeed(i);
-                    }
+                    setServoSpeed(3770);
+//                    for (i = 3685; i <= 3720; i++)
+//                    {
+//                        setServoSpeed(i);
+//                        delay_ms(50);
+//                    }
                     
                     ck++;
                 }
             }
         
-//            else if (strncmp(commandPacket.data, CMD_TOOLS, 1)==0){
-//                sprintf("got command for tools");
-//                sprintf(readBuffer,
-//                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
-//                    7, "DRAWER1", 2, "D1", 1, getToolStatus(), 2, "CD");
-//                putsUSBUSART(readBuffer);
-//                //sprintf("%s", "received request for tools");
-//                //send data using R2Protocol.h
-//                uint32_t dataLength = 1;
-//                uint8_t data[1] = {TOOLSTATUS};
-//
-//                struct R2ProtocolPacket dataPacket = {
-//                    "DRAWER1", "NUC", data, dataLength, "" 
-//                };
-//
-//                uint8_t output[CDC_DATA_OUT_EP_SIZE];
-//                int len = R2ProtocolEncode(&dataPacket, output, CDC_DATA_OUT_EP_SIZE);
-//
-//                if (len >= 0) {
-//                    putsUSBUSART(output);
-//                    CDCTxService();
-//                }
-//            }
-//            
-//            if (RFID != 0){
-//                sprintf(readBuffer,
-//                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
-//                    7, "DRAWER1", 2, "D1", 10, RFID, 2, "CD");
-//                putsUSBUSART(readBuffer);
-//                
-//                //send data using R2Protocol.h
-//                uint32_t dataLength = 10;
-//                uint8_t data[10] = {RFID};
-//
-//                struct R2ProtocolPacket dataPacket = {
-//                    "DRAWER1", "NUC", data, dataLength, "" 
-//                };
-//
-//                uint8_t output[256];
-//                int len = R2ProtocolEncode(&dataPacket, output, 256);
-//
-//                if (len >= 0) {
-//                    putsUSBUSART(output);
-//                    CDCTxService();
-//                };
-//            }
+            else if (commandPacket.data[0] == 'T')
+            {
+                //printf("got command for tools\n");
+                uint8_t data = getToolStatus();
+                int dataLength = 1; 
+                struct R2ProtocolPacket dataPacket = {
+                    "DRAWER1", "PI","", dataLength, &data, "" 
+                };
+                uint8_t output[31];
+                int len = R2ProtocolEncode(&dataPacket, output, 31);
+                printf("%s\n", output);
+                printf("Got T\n");
+                if (len >= 0) {
+                    //printf("Packet about to be sent out!");
+                    putUSBUSART((char *) output, len);
+                    printf("Packet sent out!");
+                    CDCTxService();
+                }
+            }
+            
+            if (rfid_ready == 1)
+            {
+                uint8_t *rfidData = RFID;
+                int dataLength = 10;
+                struct R2ProtocolPacket dataPacketRfid = {
+                    "DRAWER1", "PI","", dataLength, rfidData, "" 
+                };
+                uint8_t output[40];
+                int lenRfid = R2ProtocolEncode(&dataPacketRfid, output, 40);
+                if (lenRfid >= 0) {
+                    putUSBUSART((char *) output, lenRfid);
+                    CDCTxService();
+                };
+            rfid_ready = 0; //set back to zero, latest RFID scan sent
+            int ind;
+            //clear RFID buffer once it is sent
+            for (ind = 0; ind < 10; ind++)
+            {
+                RFID[ind] = 0;
+            }
+            }
         }
         
     }//end while
-}//end main
+    PT_END(pt);
+}//end thread2
 
+int main(void)
+{
+    mPORTASetPinsDigitalOut(BIT_0);
+    int i;
+    for (i = 0; i < 12; i++)
+    {
+        mPORTAToggleBits(BIT_0);
+        delay_ms(250);
+    }
+    for (i = 0; i < 12; i++)
+    {
+        mPORTAToggleBits(BIT_0);
+        delay_ms(100);
+    }
+    mPORTAClearBits(BIT_0);
+	PPSInput(4, INT1, RPB0);
+	PPSInput(3, INT2, RPA4);
+	init_uart();
+	ConfigINT1(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+	ConfigINT2(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+    
+    //initialize protothreads
+    PT_INIT(&pt1);
+    PT_INIT(&pt2);
+    
+    //schedule threads, round robin
+    while(1)
+    {
+        PT_SCHEDULE(protothread1(&pt1));
+        PT_SCHEDULE(protothread2(&pt2));
+    }
+}//end main
 
 /********************************************************************
  * Function:        static void InitializeSystem(void)
@@ -395,7 +518,6 @@ uint8_t getToolStatus(void) {
     uint8_t end = 1;
 
     uint8_t toolStatus = start + sw1 + sw2 + sw3 + sw4 + sw5 + sw6 + end;
-    TOOLSTATUS = toolStatus;
     return toolStatus;
 }
 
