@@ -242,7 +242,7 @@ int ProcessIO(struct R2ProtocolPacket *packet)
         }//end if
         CDCTxService();
     } //end while  
-    delay_ms(200);
+    //delay_ms(200);
     return result;
 
 }//end ProcessIO

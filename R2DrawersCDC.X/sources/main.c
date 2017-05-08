@@ -52,10 +52,10 @@
 #include "../includes/HardwareProfile.h"
 
 
-#pragma config FNOSC = PRIPLL, POSCMOD = HS, FSOSCEN = OFF, OSCIOFNC = OFF
-#pragma config FPLLIDIV = DIV_2, FPLLMUL = MUL_20, FPBDIV = DIV_1, FPLLODIV = DIV_2
-#pragma config FWDTEN = OFF, JTAGEN = OFF, ICESEL = ICS_PGx3
-#pragma config UPLLIDIV = DIV_2, UPLLEN = ON
+//#pragma config FNOSC = PRIPLL, POSCMOD = HS, FSOSCEN = OFF, OSCIOFNC = OFF
+//#pragma config FPLLIDIV = DIV_2, FPLLMUL = MUL_20, FPBDIV = DIV_1, FPLLODIV = DIV_2
+//#pragma config FWDTEN = OFF, JTAGEN = OFF, ICESEL = ICS_PGx3
+//#pragma config UPLLIDIV = DIV_2, UPLLEN = ON
 
 /** I N C L U D E S **********************************************************/
 
@@ -70,6 +70,8 @@
 #include "../includes/uart_init.h"
 #include "../includes/uart_init.c"
 #include "../includes/R2Protocol.h"
+#include "../protothreads.h"
+
 
 
 #define EnablePullUpB(bits) CNPDBCLR=bits; CNPUBSET=bits;
@@ -89,10 +91,24 @@
 #define SERVO_CLOSE (SERVO_REST - SERVO_RUN_SPEED)
 
 /** V A R I A B L E S ********************************************************/
-char RFID[10] = {0};
+unsigned char RFID[10] = {0}; //stores RFID transmissions
+unsigned char rxchar = '0'; //receives a byte
+int rfid_ready = 0; //tells drawer thread that RFID buffer is correct, send to R2bot over USB
 char TOOLSTATUS;
 extern char USB_Out_Buffer[CDC_DATA_OUT_EP_SIZE];
+enum states1 {
+    WAIT_TRANSMIT, //wait for STX byte to be sent from RFID module
+    STX_RECEIVED,  //get 10 data bytes, CR+LF, ETX byte. 
+    ETX_RECEIVED,  //check if checksum is correct
+    CHECKSUM_CORRECT //print 10 data bytes + checksum
+};
 
+enum states1 rfid_state = WAIT_TRANSMIT;
+
+//thread control struct
+static struct pt pt1, pt2;
+//sem
+static struct pt_sem control_t1, control_t2;
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 static void InitializeSystem(void);
 void initPWM(void);
@@ -117,64 +133,116 @@ uint8_t getToolStatus(void);
  * Note:            None
  *****************************************************************************/
 
-int main(void)
-{   
-    mPORTASetPinsDigitalOut(BIT_0);
-    int i;
-    for (i = 0; i < 12; i++)
-    {
-        mPORTAToggleBits(BIT_0);
-        delay_ms(250);
-    }
-    for (i = 0; i < 12; i++)
-    {
-        mPORTAToggleBits(BIT_0);
-        delay_ms(100);
-    }
-    mPORTAClearBits(BIT_0);
-	PPSInput(4, INT1, RPB0);
-	PPSInput(3, INT2, RPA4);
-	init_uart();
-	ConfigINT1(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
-	ConfigINT2(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
-	
-    //initialize PWM and Limit Switches, Tool Switches, and RFID
-    InitializeSystem();
-
-    #if defined(USB_INTERRUPT)
-        USBDeviceAttach();
-    #endif
-
+static PT_THREAD (protothread1(struct pt *pt))
+{
+    PT_BEGIN(pt);
+    
+    unsigned char checkSum[50] = {0}; //stores converted ASCII to hex from rfid_buffer
+    unsigned char actualCS1 = '0';
+    unsigned char actualCS2 = '0';
+    
+    int j; 
     while(1)
-    {	
-        #if defined(USB_POLLING)
-		// Check bus status and service USB interrupts.
-        USBDeviceTasks(); // Interrupt or polling method.  If using polling, must call
-        				  // this function periodically.  This function will take care
-        				  // of processing and responding to SETUP transactions 
-        				  // (such as during the enumeration process when you first
-        				  // plug in).  USB hosts require that USB devices should accept
-        				  // and process SETUP packets in a timely fashion.  Therefore,
-        				  // when using polling, this function should be called 
-        				  // regularly (such as once every 1.8ms or faster** [see 
-        				  // inline code comments in usb_device.c for explanation when
-        				  // "or faster" applies])  In most cases, the USBDeviceTasks() 
-        				  // function does not take very long to execute (ex: <100 
-        				  // instruction cycles) before it returns.
-        #endif
+    {
+        switch(rfid_state)
+        {
+            case WAIT_TRANSMIT:
+                PT_YIELD_UNTIL(pt, UARTReceivedDataIsAvailable(UART1));
+//                printf("got first byte\n");
+                rxchar = UARTGetDataByte(UART1);
+                if (rxchar == 2)
+                    rfid_state = STX_RECEIVED;
+            case STX_RECEIVED:
+                for (j = 0; j < 10; j++) //get next 10 data bytes
+                {                  
+                   while(!UARTReceivedDataIsAvailable(UART1)){};
+                   RFID[j] = UARTGetDataByte(UART1); 
+//                   printf("getting byte: %c\n", RFID[j]);
+                }
+                while(!UARTReceivedDataIsAvailable(UART1)){};
+                actualCS1 = UARTGetDataByte(UART1); //receive first checksum byte
+                while(!UARTReceivedDataIsAvailable(UART1)){};
+                actualCS2 = UARTGetDataByte(UART1);//receive second checksum byte
+            
+                for (j = 0; j < 2; j++) //receives CR + LF
+                {
+                   while(!UARTReceivedDataIsAvailable(UART1)){};
+                   UARTGetDataByte(UART1);
+                }
+                while(!UARTReceivedDataIsAvailable(UART1)){};
+                rxchar = UARTGetDataByte(UART1); //receives ETX character, stores in rxchar              
+                if (rxchar == 3)
+                    rfid_state = ETX_RECEIVED;
+                else
+                {
+                    rfid_state = WAIT_TRANSMIT;
+                    for (j = 0; j < 10; j++)
+                    {
+                        RFID[j] = 0;
+                    }
+                }
+                break;
+            case ETX_RECEIVED:
+//                printf("Got ETX\n");
+                for (j = 0; j < 10; j++) //converts ascii from rfid_buffer to hex into checkSum
+                {
+                    char x = RFID[j];
+                    if (x < 58 && x > 47)
+                        x = x - 48;
+                    else 
+                        x = x - 55;
+                    checkSum[j] = x;
+                }
+                char CS1 = checkSum[0] ^ checkSum[2] ^ 
+                checkSum[4] ^ checkSum[6] ^ checkSum[8]; //calculates 1st checksum byte
+                char CS2 = checkSum[1] ^ checkSum[3] ^ 
+                checkSum[5] ^ checkSum[7] ^ checkSum[9];//calculates 2nd checksum byte
+           
+                if (CS1 < 10)
+                    CS1 = CS1 + 48;
+                else 
+                    CS1 = CS1 + 55;
+                if (CS2 < 10)
+                    CS2 = CS2 + 48;
+                else 
+                    CS2 = CS2 + 55;
+                
+                if ((CS1 == actualCS1) && (CS2 == actualCS2)) //if checksum is correct and ETX received
+                    rfid_state = CHECKSUM_CORRECT;
+                else
+                {
+                    rfid_state = WAIT_TRANSMIT;
+                    for (j = 0; j < 10; j++)
+                    {
+                        RFID[j] = 0;
+                    }
+                }
+                break;
+            case CHECKSUM_CORRECT:
+                for (j = 0; j < 10; j++)
+                {
+                    printf("%c", RFID[j]);
+                }
+                printf("\n");
+                //rfid_buffer contains the correct 10 ascii bytes
+                rfid_ready = 1;
+//                printf("\nRFID ready: %d\n", rfid_ready);
+                rfid_state = WAIT_TRANSMIT;
+                break;   
+        }  
+    }//endwhile  
+    PT_END(pt);
+}
 
-        OpenTimer1(T1_ON | T1_PS_1_256, 0xFFFF);
-        
-//        char sourceBuffer[2] = {0};
-//        char transactionBuffer[2] = {0};
-//        char payloadBuffer[1] = {0};
-//        char checksumBuffer[2] = {0};
-//            
-		// Application-specific tasks.
-		// Application related code may be added here, or in the ProcessIO() function.
-        //int result = ProcessIO(sourceBuffer, payloadBuffer, checksumBuffer, transactionBuffer);
-        
-        printf("");
+static PT_THREAD (protothread2(struct pt *pt))
+{   
+    PT_BEGIN(pt);
+    while(1)
+    {
+        //PT_SEM_WAIT(pt, &control_t2);
+//        printf("2nd thread\n");
+        PT_YIELD(pt);
+        //printf("hi\n");
         struct R2ProtocolPacket commandPacket;  //struct to store command received
         uint8_t packetData[32] = {0};
         commandPacket.data_len = 32;
@@ -227,7 +295,6 @@ int main(void)
             {
                 //printf("got command for tools\n");
                 uint8_t data = getToolStatus();
-
                 int dataLength = 1; 
                 struct R2ProtocolPacket dataPacket = {
                     "DRAWER1", "PI","", dataLength, &data, "" 
@@ -239,38 +306,100 @@ int main(void)
                 if (len >= 0) {
                     //printf("Packet about to be sent out!");
                     putUSBUSART((char *) output, len);
-                    printf("Packet sent out!");
+                    printf("Packet sent out: %s\n", data);
                     CDCTxService();
                 }
             }
-//            
-//            if (RFID != 0){
-//                sprintf(readBuffer,
-//                "S: %d%s\n\rT: %d%s\n\rP: %d%s\n\rK: %d%s\n\r",
-//                    7, "DRAWER1", 2, "D1", 10, RFID, 2, "CD");
-//                putsUSBUSART(readBuffer);
-//                
-//                //send data using R2Protocol.h
-//                uint32_t dataLength = 10;
-//                uint8_t data[10] = {RFID};
-//
-//                struct R2ProtocolPacket dataPacket = {
-//                    "DRAWER1", "NUC", data, dataLength, "" 
-//                };
-//
-//                uint8_t output[256];
-//                int len = R2ProtocolEncode(&dataPacket, output, 256);
-//
-//                if (len >= 0) {
-//                    putsUSBUSART(output);
-//                    CDCTxService();
-//                };
-//            }
-        }
+        } //end if USB transmission receied
         
-    }//end while
-}//end main
+        if (rfid_ready == 1)
+        {
+            uint8_t *rfidData = RFID;
+            int dataLength = 10;
+            struct R2ProtocolPacket dataPacketRfid = {
+                "RFID", "PI","", dataLength, rfidData, "" 
+            };
+            uint8_t output[37];
+            int lenRfid = R2ProtocolEncode(&dataPacketRfid, output, 37);
+            if (lenRfid >= 0) {
+                putUSBUSART((char *) output, lenRfid);
+                printf("RFID sent out!\n");
+                CDCTxService();
+            };
+            rfid_ready = 0; //set back to zero, latest RFID scan sent
 
+            int ind;
+            //clear RFID buffer once it is sent
+            for (ind = 0; ind < 10; ind++)
+            {
+               RFID[ind] = 0;
+            }
+        }       
+    } //endwhile1
+    PT_END(pt);
+}//end thread2
+
+int main(void)
+{
+    printf("Started\n");
+    mPORTASetPinsDigitalOut(BIT_0);
+    int i;
+    for (i = 0; i < 12; i++)
+    {
+        mPORTAToggleBits(BIT_0);
+        delay_ms(250);
+        WDTCONbits.WDTCLR = 1; // feed the watchdog
+    }
+    for (i = 0; i < 12; i++)
+    {
+        mPORTAToggleBits(BIT_0);
+        delay_ms(100);
+        WDTCONbits.WDTCLR = 1; // feed the watchdog
+
+    }
+    mPORTAClearBits(BIT_0);
+	PPSInput(4, INT1, RPB0);
+	PPSInput(3, INT2, RPA4);
+	init_uart();
+	ConfigINT1(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+	ConfigINT2(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+    
+    //initialize PWM and Limit Switches, Tool Switches, and RFID
+    InitializeSystem();
+
+    #if defined(USB_INTERRUPT)
+        USBDeviceAttach();
+    #endif
+    #if defined(USB_POLLING)
+		// Check bus status and service USB interrupts.
+        USBDeviceTasks(); // Interrupt or polling method.  If using polling, must call
+        				  // this function periodically.  This function will take care
+        				  // of processing and responding to SETUP transactions 
+        				  // (such as during the enumeration process when you first
+        				  // plug in).  USB hosts require that USB devices should accept
+        				  // and process SETUP packets in a timely fashion.  Therefore,
+        				  // when using polling, this function should be called 
+        				  // regularly (such as once every 1.8ms or faster** [see 
+        				  // inline code comments in usb_device.c for explanation when
+        				  // "or faster" applies])  In most cases, the USBDeviceTasks() 
+        				  // function does not take very long to execute (ex: <100 
+        				  // instruction cycles) before it returns.
+    #endif
+
+        OpenTimer1(T1_ON | T1_PS_1_256, 0xFFFF);
+    //initialize protothreads
+    PT_INIT(&pt1);
+    PT_INIT(&pt2);
+    
+    //schedule threads, round robin
+    while(1)
+    {
+        PT_SCHEDULE(protothread1(&pt1));
+        WDTCONbits.WDTCLR = 1; // feed the watchdog
+        PT_SCHEDULE(protothread2(&pt2));
+        WDTCONbits.WDTCLR = 1; // feed the watchdog
+    }
+}//end main
 
 /********************************************************************
  * Function:        static void InitializeSystem(void)

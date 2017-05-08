@@ -20,4 +20,7 @@ sources/../includes/uart_init.h  \
  sources/../includes/uart_init.c  \
 sources/../includes/uart_init.h  \
  sources/../includes/global.h  \
-sources/../includes/R2Protocol.h 
+sources/../includes/R2Protocol.h  \
+ sources/../protothreads.h  \
+sources/../includes/global.h  \
+ sources/../pt_config.h 
