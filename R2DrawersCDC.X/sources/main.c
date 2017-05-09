@@ -90,6 +90,17 @@
 #define SERVO_OPEN  (SERVO_REST + SERVO_RUN_SPEED)
 #define SERVO_CLOSE (SERVO_REST - SERVO_RUN_SPEED)
 
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  (byte & 0x80 ? '1' : '0'), \
+  (byte & 0x40 ? '1' : '0'), \
+  (byte & 0x20 ? '1' : '0'), \
+  (byte & 0x10 ? '1' : '0'), \
+  (byte & 0x08 ? '1' : '0'), \
+  (byte & 0x04 ? '1' : '0'), \
+  (byte & 0x02 ? '1' : '0'), \
+  (byte & 0x01 ? '1' : '0') 
+
 /** V A R I A B L E S ********************************************************/
 unsigned char RFID[10] = {0}; //stores RFID transmissions
 unsigned char rxchar = '0'; //receives a byte
@@ -219,10 +230,7 @@ static PT_THREAD (protothread1(struct pt *pt))
                 }
                 break;
             case CHECKSUM_CORRECT:
-                for (j = 0; j < 10; j++)
-                {
-                    printf("%c", RFID[j]);
-                }
+                printf("%s", RFID);
                 printf("\n");
                 //rfid_buffer contains the correct 10 ascii bytes
                 rfid_ready = 1;
@@ -266,7 +274,7 @@ static PT_THREAD (protothread2(struct pt *pt))
                 {
                 //sprintf("%s", "received cmd to open");
                     printf("Servo Close\n");
-                    setServoSpeed(3600);
+                    setServoSpeed(3650);
 //                    for (i = 3685; i >= 3650; i--)
 //                    {
 //                        setServoSpeed(i);
@@ -280,7 +288,7 @@ static PT_THREAD (protothread2(struct pt *pt))
                 if (ck % 1 == 0)
                 {
                     printf("Servo Open\n");
-                    setServoSpeed(3770);
+                    setServoSpeed(3715);
 //                    for (i = 3685; i <= 3720; i++)
 //                    {
 //                        setServoSpeed(i);
@@ -294,6 +302,7 @@ static PT_THREAD (protothread2(struct pt *pt))
             else if (commandPacket.data[0] == 'T')
             {
                 //printf("got command for tools\n");
+//                uint8_t data = 'H';
                 uint8_t data = getToolStatus();
                 int dataLength = 1; 
                 struct R2ProtocolPacket dataPacket = {
@@ -306,7 +315,7 @@ static PT_THREAD (protothread2(struct pt *pt))
                 if (len >= 0) {
                     //printf("Packet about to be sent out!");
                     putUSBUSART((char *) output, len);
-                    printf("Packet sent out: %s\n", data);
+                    printf("Tools sent out: \n"BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(data));
                     CDCTxService();
                 }
             }
@@ -517,12 +526,12 @@ void initToolStatus(void) {
 
 uint8_t getToolStatus(void) {
     uint8_t start = 0;
-    uint8_t sw1 =  (mPORTBReadBits(BIT_1)>0)*64;
-    uint8_t sw2 =  (mPORTBReadBits(BIT_2)>0)*32;
-    uint8_t sw3 =  (mPORTBReadBits(BIT_3)>0)*16;
-    uint8_t sw4 =  (mPORTBReadBits(BIT_7)>0)*8;
-    uint8_t sw5 =  (mPORTBReadBits(BIT_14)>0)*4;
-    uint8_t sw6 =  (mPORTBReadBits(BIT_15)>0)*2;
+    uint8_t sw1 =  ((mPORTBReadBits(BIT_1)>0))*64;
+    uint8_t sw2 =  ((mPORTBReadBits(BIT_2)>0))*32;
+    uint8_t sw3 =  ((mPORTBReadBits(BIT_3)>0))*16;
+    uint8_t sw4 =  ((mPORTBReadBits(BIT_7)>0))*8;
+    uint8_t sw5 =  ((mPORTBReadBits(BIT_14)>0))*4;
+    uint8_t sw6 =  ((mPORTBReadBits(BIT_15)>0))*2;
     uint8_t end = 1;
 
     uint8_t toolStatus = start + sw1 + sw2 + sw3 + sw4 + sw5 + sw6 + end;
