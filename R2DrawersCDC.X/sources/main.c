@@ -84,7 +84,7 @@
 
 #define PERIOD      50000   // 20 ms
 #define SERVO_MIN   2000    // 1000 us
-#define SERVO_REST  3680    // 1500 us
+#define SERVO_REST  3685    // 1500 us
 #define SERVO_MAX   5000    // 2000 us
 #define SERVO_RUN_SPEED     30     //400 us
 #define SERVO_OPEN  (SERVO_REST + SERVO_RUN_SPEED)
@@ -274,7 +274,7 @@ static PT_THREAD (protothread2(struct pt *pt))
                 {
                 //sprintf("%s", "received cmd to open");
                     printf("Servo Close\n");
-                    setServoSpeed(3650);
+                    setServoSpeed(3605);
 //                    for (i = 3685; i >= 3650; i--)
 //                    {
 //                        setServoSpeed(i);
@@ -288,7 +288,7 @@ static PT_THREAD (protothread2(struct pt *pt))
                 if (ck % 1 == 0)
                 {
                     printf("Servo Open\n");
-                    setServoSpeed(3715);
+                    setServoSpeed(3770);
 //                    for (i = 3685; i <= 3720; i++)
 //                    {
 //                        setServoSpeed(i);
@@ -367,11 +367,16 @@ int main(void)
 
     }
     mPORTAClearBits(BIT_0);
-	PPSInput(4, INT1, RPB0);
+//    mINT1IntEnable(1);
+//    mINT2IntEnable(1);
+    SYSTEMConfigPerformance(SYS_FREQ);
+    INTEnableSystemMultiVectoredInt();
+	PPSInput(1, INT4, RPB15);
 	PPSInput(3, INT2, RPA4);
 	init_uart();
-	ConfigINT1(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+	ConfigINT4(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
 	ConfigINT2(EXT_INT_ENABLE | FALLING_EDGE_INT | EXT_INT_PRI_2);
+    
     
     //initialize PWM and Limit Switches, Tool Switches, and RFID
     InitializeSystem();
@@ -480,7 +485,7 @@ static void InitializeSystem(void)
 	
 	initPWM();
 	EnablePullUpA(BIT_4); //back limit switch
-	EnablePullUpB(BIT_0); //front limit switch
+	EnablePullUpB(BIT_15); //front limit switch
     initToolStatus();
 	
 }//end InitializeSystem
@@ -507,21 +512,24 @@ void setServoSpeed(int speed){
     if (speed > SERVO_MAX) speed = SERVO_MAX;
     SetDCOC1PWM(speed);		//RPB4, OC1
 }
-
-void __ISR(_EXTERNAL_1_VECTOR, ipl1) StopOpen(void) { //INT1, RPB0, Front Switch (FR_SW)
-	mINT1ClearIntFlag();
+//interrupts switched
+void __ISR(_EXTERNAL_4_VECTOR, ipl2) StopOpen(void) { //INT1, RPB15, Front Switch (FR_SW)
+	mINT4ClearIntFlag();
 	setServoSpeed(SERVO_REST);
+    printf("Motor close stopped!\n");
 }
 
 void __ISR(_EXTERNAL_2_VECTOR, ipl2) StopClose(void) { //INT2, RPA4, Back Switch (BK_SW)
 	mINT2ClearIntFlag();
 	setServoSpeed(SERVO_REST);
+    printf("Motor open stopped!\n");
 }
 
 void initToolStatus(void) {
     //Initialize tool switches as digital inputs
     //SW1 = RB1, SW2 = RB2, SW3 = RB3, SW4 = RB7, SW5 = RB14, SW6 = RB15
-    mPORTBSetPinsDigitalIn(BIT_1 | BIT_2 | BIT_3 | BIT_7 | BIT_14 | BIT_15);
+    mPORTBSetPinsDigitalIn(BIT_1 | BIT_2 | BIT_3 | BIT_7 | BIT_14);
+    EnablePullUpB(BIT_1 | BIT_2 | BIT_3 | BIT_7 | BIT_14 );
 }
 
 uint8_t getToolStatus(void) {
