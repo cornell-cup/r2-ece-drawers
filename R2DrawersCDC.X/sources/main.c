@@ -522,6 +522,7 @@ void initToolStatus(void) {
     //Initialize tool switches as digital inputs
     //SW1 = RB1, SW2 = RB2, SW3 = RB3, SW4 = RB7, SW5 = RB14, SW6 = RB15
     mPORTBSetPinsDigitalIn(BIT_1 | BIT_2 | BIT_3 | BIT_7 | BIT_14 | BIT_15);
+    EnablePullUpB(BIT_1 | BIT_2 | BIT_3 | BIT_7 | BIT_14 | BIT_15);
 }
 
 uint8_t getToolStatus(void) {
