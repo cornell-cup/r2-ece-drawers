@@ -72,8 +72,6 @@
 #include "../includes/R2Protocol.h"
 #include "../protothreads.h"
 
-
-
 #define EnablePullUpB(bits) CNPDBCLR=bits; CNPUBSET=bits;
 #define EnablePullUpA(bits) CNPDACLR=bits; CNPUASET=bits;
 
@@ -82,11 +80,11 @@
 #define CMD_CLOSE   "C"
 #define CMD_TOOLS   "T"
 
-#define PERIOD      50000   // 20 ms
-#define SERVO_MIN   2000    // 1000 us
-#define SERVO_REST  3685    // 1500 us
-#define SERVO_MAX   5000    // 2000 us
-#define SERVO_RUN_SPEED     30     //400 us
+#define PERIOD          50000   // 20 ms
+#define SERVO_MIN       2000    // 1000 us
+#define SERVO_REST      3685    // 1500 us
+#define SERVO_MAX       5000    // 2000 us
+#define SERVO_RUN_SPEED 80      //
 #define SERVO_OPEN  (SERVO_REST + SERVO_RUN_SPEED)
 #define SERVO_CLOSE (SERVO_REST - SERVO_RUN_SPEED)
 
@@ -248,7 +246,7 @@ static PT_THREAD (protothread2(struct pt *pt))
     while(1)
     {
         //PT_SEM_WAIT(pt, &control_t2);
-//        printf("2nd thread\n");
+        //printf("2nd thread\n");
         PT_YIELD(pt);
         //printf("hi\n");
         struct R2ProtocolPacket commandPacket;  //struct to store command received
@@ -274,35 +272,20 @@ static PT_THREAD (protothread2(struct pt *pt))
                 {
                 //sprintf("%s", "received cmd to open");
                     printf("Servo Close\n");
-                    setServoSpeed(3605);
-//                    for (i = 3685; i >= 3650; i--)
-//                    {
-//                        setServoSpeed(i);
-//                        delay_ms(50);
-//                    }
-//                    ck++;
+                    setServoSpeed(SERVO_CLOSE);
                 }
             }
             else if (commandPacket.data[0] == 'O'){
-                //sprintf("%s", "received cmd to close");
                 if (ck % 1 == 0)
                 {
                     printf("Servo Open\n");
-                    setServoSpeed(3770);
-//                    for (i = 3685; i <= 3720; i++)
-//                    {
-//                        setServoSpeed(i);
-//                        delay_ms(50);
-//                    }
-                    
+                    setServoSpeed(SERVO_OPEN);
                     ck++;
                 }
             }
         
             else if (commandPacket.data[0] == 'T')
             {
-                //printf("got command for tools\n");
-//                uint8_t data = 'H';
                 uint8_t data = getToolStatus();
                 int dataLength = 1; 
                 struct R2ProtocolPacket dataPacket = {
@@ -484,8 +467,8 @@ static void InitializeSystem(void)
     					//variables to known states.
 	
 	initPWM();
-	EnablePullUpA(BIT_4); //back limit switch
-	EnablePullUpB(BIT_15); //front limit switch
+	EnablePullUpA(BIT_4);   //back limit switch
+	EnablePullUpB(BIT_15);  //front limit switch
     initToolStatus();
 	
 }//end InitializeSystem
