@@ -1,3 +1,12 @@
+/*
+Created by Jackie Woo
+
+Controls the drawer motor
+As of 10/20/18 the delay (which controls how long 
+the motor moves in a certain direction) has not been
+optimized for R2's drawers specifically.
+*/
+
 #include <stdint.h>
 #include <Servo.h>
 
